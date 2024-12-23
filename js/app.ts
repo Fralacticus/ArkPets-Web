@@ -18,11 +18,26 @@ interface Character {
         offset: spine.Vector2;
         size: spine.Vector2;
     };
+    currentAction: Action;
+}
+
+type Direction = "left" | "right";
+
+interface Action {
+    animation: string;
+    direction: Direction;
 }
 
 let character: Character;
 
-const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" /*, "Sleep" */];
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
+const ANIMATION_MARKOV = [
+    [0.5, 0.1, 0.2, 0.1, 0.1],
+    [1.0, 0.0, 0.0, 0.0, 0.0],
+    [0.3, 0.0, 0.7, 0.0, 0.0],
+    [0.5, 0.0, 0.0, 0.5, 0.0],
+    [0.3, 0.0, 0.0, 0.0, 0.7],
+]
 
 function init(): void {
     // Setup canvas and WebGL context
@@ -92,8 +107,10 @@ function loadCharacter(): Character {
     // Listen for animation completion
     class AnimationStateAdapter extends spine.AnimationStateAdapter {
         complete(entry: spine.TrackEntry): void {
-            const nextAnim = nextRandomAnimation(entry.animation.name);
-            animationState.setAnimation(0, nextAnim, true);
+            const action = nextAction(character.currentAction);
+            character.currentAction = action;
+            console.log("Play animation", action.animation)
+            animationState.setAnimation(0, action.animation, true);
         }
     }
     animationState.addListener(new AnimationStateAdapter());
@@ -102,6 +119,10 @@ function loadCharacter(): Character {
         skeleton,
         state: animationState,
         bounds,
+        currentAction: {
+            animation: "Relax",
+            direction: "right",
+        },
     };
 }
 
@@ -162,12 +183,36 @@ function resize(): void {
     character.skeleton.y = 0;
 }
 
-function nextRandomAnimation(current?: string): string {
-    const availableAnimations = current 
-        ? ANIMATION_NAMES.filter(name => name !== current)
-        : ANIMATION_NAMES;
-    const randomIndex = Math.floor(Math.random() * availableAnimations.length);
-    return availableAnimations[randomIndex];
+function randomPick(probabilities: number[]): number {
+    let random = Math.random();
+    let cumulativeProb = 0;
+    for (let i = 0; i < probabilities.length; i++) {
+        cumulativeProb += probabilities[i];
+        if (random <= cumulativeProb) {
+            return i;
+        }
+    }
+    throw new Error("Invalid probabilities: " + probabilities);
+}
+
+function turnDirection(current: Direction): Direction {
+    return current === "left" ? "right" : "left";
+}
+
+function nextAction(current: Action): Action {
+    const animeIndex = ANIMATION_NAMES.indexOf(current.animation);
+    const nextIndexProb = ANIMATION_MARKOV[animeIndex];
+    const nextAnimIndex = randomPick(nextIndexProb);
+    const nextAnim = ANIMATION_NAMES[nextAnimIndex];
+
+    let nextDirection = current.direction;
+    if (current.animation === "Relax" && nextAnim === "Move") {
+        nextDirection = Math.random() < 0.3 ? turnDirection(current.direction) : current.direction;
+    }
+    return {
+        animation: nextAnim,
+        direction: nextDirection
+    };
 }
 
 window.addEventListener('load', init); 
