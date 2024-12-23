@@ -22,7 +22,7 @@ interface Character {
 
 let character: Character;
 
-const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit", "Sleep"];
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" /*, "Sleep" */];
 
 function init(): void {
     // Setup canvas and WebGL context
@@ -87,9 +87,18 @@ function loadCharacter(): Character {
             }
         });
     });
-    
+
     const animationState = new spine.AnimationState(animationStateData);
     animationState.setAnimation(0, "Relax", true);
+
+    // Listen for animation completion
+    class AnimationStateAdapter extends spine.AnimationStateAdapter {
+        complete(entry: spine.TrackEntry): void {
+            const nextAnim = nextRandomAnimation(entry.animation.name);
+            animationState.setAnimation(0, nextAnim, true);
+        }
+    }
+    animationState.addListener(new AnimationStateAdapter());
 
     return {
         skeleton,
@@ -155,6 +164,14 @@ function resize(): void {
     // Position the skeleton at the center of the canvas
     character.skeleton.x = canvas.width / 2;
     character.skeleton.y = 0;
+}
+
+function nextRandomAnimation(current?: string): string {
+    const availableAnimations = current 
+        ? ANIMATION_NAMES.filter(name => name !== current)
+        : ANIMATION_NAMES;
+    const randomIndex = Math.floor(Math.random() * availableAnimations.length);
+    return availableAnimations[randomIndex];
 }
 
 window.addEventListener('load', init); 
