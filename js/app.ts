@@ -22,6 +22,8 @@ interface Character {
 
 let character: Character;
 
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit", "Sleep"];
+
 function init(): void {
     // Setup canvas and WebGL context
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -57,7 +59,7 @@ function init(): void {
 
 function load(): void {
     if (assetManager.isLoadingComplete()) {
-        character = loadCharacter("Sit");
+        character = loadCharacter();
         lastFrameTime = Date.now() / 1000;
         requestAnimationFrame(render);
     } else {
@@ -65,7 +67,7 @@ function load(): void {
     }
 }
 
-function loadCharacter(initialAnimation: string): Character {
+function loadCharacter(): Character {
     const atlas = assetManager.get("assets/models/4058_pepe/build_char_4058_pepe.atlas");
     const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
     const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
@@ -76,8 +78,18 @@ function loadCharacter(initialAnimation: string): Character {
     const bounds = calculateSetupPoseBounds(skeleton);
 
     const animationStateData = new spine.AnimationStateData(skeleton.data);
+
+    // Animation transitions
+    ANIMATION_NAMES.forEach(fromAnim => {
+        ANIMATION_NAMES.forEach(toAnim => {
+            if (fromAnim !== toAnim) {
+                animationStateData.setMix(fromAnim, toAnim, 0.3);
+            }
+        });
+    });
+    
     const animationState = new spine.AnimationState(animationStateData);
-    animationState.setAnimation(0, initialAnimation, true);
+    animationState.setAnimation(0, "Relax", true);
 
     return {
         skeleton,
