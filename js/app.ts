@@ -28,8 +28,7 @@ function init(): void {
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    gl = (canvas.getContext("webgl", { alpha: false }) || 
-         canvas.getContext("experimental-webgl", { alpha: false })) as WebGLRenderingContext;
+    gl = canvas.getContext("webgl", { alpha: false }) as WebGLRenderingContext;
     
     if (!gl) {
         alert('WebGL is unavailable.');
@@ -129,18 +128,16 @@ function resize(): void {
         canvas.height = h;
     }
 
+    // Keep original scale (1:1 pixel ratio)
     const bounds = character.bounds;
-    const centerX = bounds.offset.x + bounds.size.x / 2;
-    const centerY = bounds.offset.y + bounds.size.y / 2;
-    const scaleX = bounds.size.x / canvas.width;
-    const scaleY = bounds.size.y / canvas.height;
-    let scale = Math.max(scaleX, scaleY) * 1.2;
-    if (scale < 1) scale = 1;
-    const width = canvas.width * scale;
-    const height = canvas.height * scale;
-
-    mvp.ortho2d(centerX - width / 2, centerY - height / 2, width, height);
+    
+    // Center the character in the canvas
+    mvp.ortho2d(0, 0, canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
+
+    // Position the skeleton at the center of the canvas
+    character.skeleton.x = canvas.width / 2;
+    character.skeleton.y = 0;
 }
 
 window.addEventListener('load', init); 
