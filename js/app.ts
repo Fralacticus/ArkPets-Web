@@ -109,7 +109,7 @@ function loadCharacter(): Character {
         complete(entry: spine.TrackEntry): void {
             const action = nextAction(character.currentAction);
             character.currentAction = action;
-            console.log("Play animation", action.animation)
+            console.log("Play action", action)
             animationState.setAnimation(0, action.animation, true);
         }
     }
@@ -147,6 +147,10 @@ function render(): void {
 
     const state = character.state;
     const skeleton = character.skeleton;
+    
+    // Set the scale based on direction
+    skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
+    
     state.update(delta);
     state.apply(skeleton);
     skeleton.updateWorldTransform();
@@ -207,7 +211,7 @@ function nextAction(current: Action): Action {
 
     let nextDirection = current.direction;
     if (current.animation === "Relax" && nextAnim === "Move") {
-        nextDirection = Math.random() < 0.3 ? turnDirection(current.direction) : current.direction;
+        nextDirection = Math.random() < 0.4 ? turnDirection(current.direction) : current.direction;
     }
     return {
         animation: nextAnim,
