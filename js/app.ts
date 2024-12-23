@@ -27,8 +27,7 @@ const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" /*, "Sleep" */];
 function init(): void {
     // Setup canvas and WebGL context
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+
     gl = canvas.getContext("webgl", {
         alpha: true,
         premultipliedAlpha: false
@@ -46,7 +45,6 @@ function init(): void {
     // Create WebGL objects
     shader = webgl.Shader.newTwoColoredTextured(gl);
     batcher = new webgl.PolygonBatcher(gl);
-    mvp.ortho2d(0, 0, canvas.width - 1, canvas.height - 1);
     skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(gl));
     assetManager = new webgl.AssetManager(gl);
 
@@ -147,16 +145,14 @@ function render(): void {
 }
 
 function resize(): void {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    if (canvas.width != w || canvas.height != h) {
-        canvas.width = w;
-        canvas.height = h;
-    }
+    // Get the minimum required width and height based on character bounds
+    const minWidth = character.bounds.size.x * 1.5;
+    const minHeight = character.bounds.size.y * 1.2;
 
-    // Keep original scale (1:1 pixel ratio)
-    const bounds = character.bounds;
-
+    // Set canvas size to the larger of window size or minimum required size
+    canvas.width = minWidth;
+    canvas.height = minHeight;
+    
     // Center the character in the canvas
     mvp.ortho2d(0, 0, canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
