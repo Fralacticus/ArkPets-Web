@@ -18,7 +18,6 @@ interface Character {
         offset: spine.Vector2;
         size: spine.Vector2;
     };
-    premultipliedAlpha: boolean;
 }
 
 let character: Character;
@@ -28,30 +27,37 @@ function init(): void {
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    gl = canvas.getContext("webgl", { alpha: false }) as WebGLRenderingContext;
-    
+    gl = canvas.getContext("webgl", {
+        alpha: true,
+        premultipliedAlpha: false
+    }) as WebGLRenderingContext;
+
     if (!gl) {
         alert('WebGL is unavailable.');
         return;
     }
 
+    // Set up blending for non-premultiplied alpha
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     // Create WebGL objects
     shader = webgl.Shader.newTwoColoredTextured(gl);
     batcher = new webgl.PolygonBatcher(gl);
     mvp.ortho2d(0, 0, canvas.width - 1, canvas.height - 1);
-    skeletonRenderer = new webgl.SkeletonRenderer(gl as any);
+    skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(gl));
     assetManager = new webgl.AssetManager(gl);
 
     // Load assets
     assetManager.loadBinary("assets/models/4058_pepe/build_char_4058_pepe.skel");
     assetManager.loadTextureAtlas("assets/models/4058_pepe/build_char_4058_pepe.atlas");
-    
+
     requestAnimationFrame(load);
 }
 
 function load(): void {
     if (assetManager.isLoadingComplete()) {
-        character = loadCharacter("Sit", false);
+        character = loadCharacter("Sit");
         lastFrameTime = Date.now() / 1000;
         requestAnimationFrame(render);
     } else {
@@ -59,11 +65,11 @@ function load(): void {
     }
 }
 
-function loadCharacter(initialAnimation: string, premultipliedAlpha: boolean): Character {
+function loadCharacter(initialAnimation: string): Character {
     const atlas = assetManager.get("assets/models/4058_pepe/build_char_4058_pepe.atlas");
     const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
     const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
-    
+
     skeletonBinary.scale = 1;
     const skeletonData = skeletonBinary.readSkeletonData(assetManager.get("assets/models/4058_pepe/build_char_4058_pepe.skel"));
     const skeleton = new spine.Skeleton(skeletonData);
@@ -73,11 +79,10 @@ function loadCharacter(initialAnimation: string, premultipliedAlpha: boolean): C
     const animationState = new spine.AnimationState(animationStateData);
     animationState.setAnimation(0, initialAnimation, true);
 
-    return { 
-        skeleton, 
-        state: animationState, 
-        bounds, 
-        premultipliedAlpha 
+    return {
+        skeleton,
+        state: animationState,
+        bounds,
     };
 }
 
@@ -97,7 +102,7 @@ function render(): void {
 
     resize();
 
-    gl.clearColor(0.3, 0.3, 0.3, 1);
+    gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const state = character.state;
@@ -111,7 +116,7 @@ function render(): void {
     shader.setUniform4x4f(webgl.Shader.MVP_MATRIX, mvp.values);
 
     batcher.begin(shader);
-    skeletonRenderer.premultipliedAlpha = character.premultipliedAlpha;
+    skeletonRenderer.premultipliedAlpha = false;
     skeletonRenderer.draw(batcher, skeleton);
     batcher.end();
 
@@ -130,7 +135,7 @@ function resize(): void {
 
     // Keep original scale (1:1 pixel ratio)
     const bounds = character.bounds;
-    
+
     // Center the character in the canvas
     mvp.ortho2d(0, 0, canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
