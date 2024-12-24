@@ -11,6 +11,33 @@ let assetManager: webgl.AssetManager;
 let skeletonRenderer: webgl.SkeletonRenderer;
 let lastFrameTime: number;
 
+
+const RESOURCE_PATH = "assets/models/";
+
+interface CharacterResource {
+    name: string;
+    skeleton: string;
+    atlas: string;
+    texture: string;
+}
+
+const CHARACTER_RESOURCES: CharacterResource[] = [
+    {
+        name: "佩佩",
+        skeleton: "4058_pepe/build_char_4058_pepe.skel",
+        atlas: "4058_pepe/build_char_4058_pepe.atlas",
+        texture: "4058_pepe/build_char_4058_pepe.png",
+    },
+    {
+        name: "荒芜拉普兰德",
+        skeleton: "1038_whitw2/build_char_1038_whitw2.skel", 
+        atlas: "1038_whitw2/build_char_1038_whitw2.atlas",
+        texture: "1038_whitw2/build_char_1038_whitw2.png",
+    },
+];
+
+let characterResource: CharacterResource = CHARACTER_RESOURCES[0];
+
 interface Character {
     skeleton: spine.Skeleton;
     state: spine.AnimationState;
@@ -61,11 +88,11 @@ function init(): void {
     shader = webgl.Shader.newTwoColoredTextured(gl);
     batcher = new webgl.PolygonBatcher(gl);
     skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(gl));
-    assetManager = new webgl.AssetManager(gl);
+    assetManager = new webgl.AssetManager(gl, RESOURCE_PATH);
 
-    // Load assets
-    assetManager.loadBinary("assets/models/4058_pepe/build_char_4058_pepe.skel");
-    assetManager.loadTextureAtlas("assets/models/4058_pepe/build_char_4058_pepe.atlas");
+    // Load assets for initial character
+    assetManager.loadBinary(characterResource.skeleton);
+    assetManager.loadTextureAtlas(characterResource.atlas);
 
     requestAnimationFrame(load);
 }
@@ -79,17 +106,18 @@ function load(): void {
 
         requestAnimationFrame(render);
     } else {
+        console.log("Loading assets of character", characterResource.name, "progress", assetManager.getLoaded(), "/", assetManager.getToLoad());
         requestAnimationFrame(load);
     }
 }
 
-function loadCharacter(): Character {
-    const atlas = assetManager.get("assets/models/4058_pepe/build_char_4058_pepe.atlas");
+function loadCharacter(): Character {    
+    const atlas = assetManager.get(characterResource.atlas);
     const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
     const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
 
     skeletonBinary.scale = 1;
-    const skeletonData = skeletonBinary.readSkeletonData(assetManager.get("assets/models/4058_pepe/build_char_4058_pepe.skel"));
+    const skeletonData = skeletonBinary.readSkeletonData(assetManager.get(characterResource.skeleton));
     const skeleton = new spine.Skeleton(skeletonData);
     const bounds = calculateSetupPoseBounds(skeleton);
 
