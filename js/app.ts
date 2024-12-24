@@ -66,6 +66,100 @@ const ANIMATION_MARKOV = [
     [0.3, 0.0, 0.0, 0.0, 0.7],
 ]
 
+function createContextMenu() {
+    const menu = document.createElement('div');
+    menu.id = 'contextMenu';
+    menu.style.display = 'none';
+    menu.style.position = 'fixed';
+    menu.style.zIndex = '1000';
+    menu.style.backgroundColor = 'white';
+    menu.style.border = '1px solid #ccc';
+    menu.style.padding = '5px 0';
+    menu.style.boxShadow = '2px 2px 5px rgba(0,0,0,0.2)';
+    menu.style.fontSize = '14px';
+    
+    // Create Characters submenu
+    const charactersMenu = document.createElement('div');
+    charactersMenu.className = 'menu-item';
+    charactersMenu.innerHTML = 'Characters ►';
+    charactersMenu.style.padding = '5px 20px';
+    charactersMenu.style.cursor = 'pointer';
+    
+    const charactersList = document.createElement('div');
+    charactersList.className = 'submenu';
+    charactersList.style.display = 'none';
+    charactersList.style.position = 'absolute';
+    charactersList.style.left = '100%';
+    charactersList.style.top = '0';
+    charactersList.style.backgroundColor = 'white';
+    charactersList.style.border = '1px solid #ccc';
+    charactersList.style.padding = '5px 0';
+    charactersList.style.minWidth = '150px';
+    
+    // Add hover styles to menu items
+    const menuItemStyle = {
+        padding: '5px 20px',
+        cursor: 'pointer',
+    };
+
+    const applyMenuItemStyles = (element: HTMLElement) => {
+        Object.assign(element.style, menuItemStyle);
+        const originalMouseover = element.onmouseover;
+        const originalMouseout = element.onmouseout;
+        element.onmouseover = (e) => {
+            element.style.backgroundColor = '#f0f0f0';
+            if (originalMouseover) originalMouseover.call(element, e);
+        };
+        element.onmouseout = (e) => {
+            element.style.backgroundColor = 'white';
+            if (originalMouseout) originalMouseout.call(element, e);
+        };
+    };
+
+    // Apply to character list items
+    CHARACTER_RESOURCES.forEach(char => {
+        const item = document.createElement('div');
+        item.innerHTML = char.name;
+        applyMenuItemStyles(item);
+        item.onclick = () => {
+            menu.style.display = 'none';
+            // TODO: Implement character switching
+            assetManager.removeAll();
+            assetManager.loadBinary(char.skeleton);
+            assetManager.loadTextureAtlas(char.atlas);
+            characterResource = char;
+            requestAnimationFrame(load);
+        };
+        charactersList.appendChild(item);
+    });
+    
+    charactersMenu.appendChild(charactersList);
+    charactersMenu.onmouseover = () => charactersList.style.display = 'block';
+    charactersMenu.onmouseout = () => charactersList.style.display = 'none';
+    
+    // Apply to Characters menu
+    applyMenuItemStyles(charactersMenu);
+    
+    // Create About menu item
+    const aboutMenu = document.createElement('div');
+    aboutMenu.className = 'menu-item';
+    aboutMenu.innerHTML = 'About';
+    aboutMenu.style.padding = '5px 20px';
+    aboutMenu.style.cursor = 'pointer';
+    aboutMenu.onclick = () => {
+        menu.style.display = 'none';
+        // TODO: Implement about menu
+    };
+
+    // Apply to About menu
+    applyMenuItemStyles(aboutMenu);
+    
+    menu.appendChild(charactersMenu);
+    menu.appendChild(aboutMenu);
+    document.body.appendChild(menu);
+    return menu;
+}
+
 function init(): void {
     // Setup canvas and WebGL context
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -98,6 +192,27 @@ function init(): void {
     canvas.addEventListener('click', handleCanvasClick);
 
     requestAnimationFrame(load);
+
+    const contextMenu = createContextMenu();
+    
+    // Add context menu event listeners
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const menu = document.getElementById('contextMenu');
+        if (menu) {
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        }
+    });
+    
+    // Hide menu when clicking outside
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('contextMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+    });
 }
 
 function load(): void {
