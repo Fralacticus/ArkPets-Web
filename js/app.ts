@@ -192,7 +192,7 @@ function render(): void {
 
 function resize(): void {
     // Get the minimum required width and height based on character bounds
-    const minWidth = character.bounds.size.x * 1.5;
+    const minWidth = character.bounds.size.x * 2;
     const minHeight = character.bounds.size.y * 1.2;
 
     // Set canvas size to the larger of window size or minimum required size
