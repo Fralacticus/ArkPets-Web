@@ -59,7 +59,7 @@ let character: Character;
 
 const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
 const ANIMATION_MARKOV = [
-    [0.5, 0.1, 0.2, 0.1, 0.1],
+    [0.5, 0.0, 0.25, 0.15, 0.1],
     [1.0, 0.0, 0.0, 0.0, 0.0],
     [0.3, 0.0, 0.7, 0.0, 0.0],
     [0.5, 0.0, 0.0, 0.5, 0.0],
@@ -93,6 +93,9 @@ function init(): void {
     // Load assets for initial character
     assetManager.loadBinary(characterResource.skeleton);
     assetManager.loadTextureAtlas(characterResource.atlas);
+
+    // Add click event listener to canvas
+    canvas.addEventListener('click', handleCanvasClick);
 
     requestAnimationFrame(load);
 }
@@ -266,6 +269,17 @@ function nextAction(current: Action): Action {
         animation: nextAnim,
         direction: nextDirection
     };
+}
+
+function handleCanvasClick(): void {
+    if (character && character.state) {
+        character.currentAction = {
+            animation: "Interact",
+            direction: character.currentAction.direction
+        };
+        character.state.setAnimation(0, "Interact", false);
+        console.log("Play action", character.currentAction);
+    }
 }
 
 window.addEventListener('load', init); 
