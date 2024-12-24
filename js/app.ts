@@ -74,6 +74,9 @@ function load(): void {
     if (assetManager.isLoadingComplete()) {
         character = loadCharacter();
         lastFrameTime = Date.now() / 1000;
+        
+        resize();
+
         requestAnimationFrame(render);
     } else {
         requestAnimationFrame(load);
@@ -140,8 +143,6 @@ function render(): void {
     const delta = now - lastFrameTime;
     lastFrameTime = now;
 
-    resize();
-
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -150,6 +151,26 @@ function render(): void {
     
     // Set the scale based on direction
     skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
+    
+    // Move the canvas when "Move" animation is playing
+    if (character.currentAction.animation === "Move") {
+        const moveSpeed = 100; // pixels per second
+        const movement = moveSpeed * delta;
+        if (character.currentAction.direction === "left") {
+            canvas.style.left = (parseFloat(canvas.style.left || "0") - movement) + "px";
+            // Turn around when reaching left edge
+            if (parseFloat(canvas.style.left) <= 0) {
+                canvas.style.left = "0px";
+                character.currentAction.direction = "right";
+            }
+        } else {
+            canvas.style.left = (parseFloat(canvas.style.left || "0") + movement) + "px";
+            // Turn around when reaching right edge
+            if (parseFloat(canvas.style.left) + canvas.width >= window.innerWidth) {
+                character.currentAction.direction = "left";
+            }
+        }
+    }
     
     state.update(delta);
     state.apply(skeleton);
