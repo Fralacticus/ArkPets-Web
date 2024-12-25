@@ -423,6 +423,21 @@ function render(): void {
 
     shader.unbind();
 
+    // Read pixels before second pass to determine if mouse is over character
+    const canvasRect = canvas.getBoundingClientRect();
+    let pixelX = Math.floor(currentMousePos.x - canvasRect.x);
+    let pixelY = Math.floor(canvas.height - (currentMousePos.y - canvasRect.y));
+    let pixelColor = new Uint8Array(4);
+    gl.readPixels(
+        pixelX, 
+        pixelY, 
+        1, 1, 
+        gl.RGBA, 
+        gl.UNSIGNED_BYTE, 
+        pixelColor
+    );
+    const isMouseOver = pixelColor[0] || pixelColor[1] || pixelColor[2];
+
     // Second pass - render to screen with outline effect
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -440,7 +455,7 @@ function render(): void {
 
     gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
     gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
-    gl.uniform1f(uOutlineWidth, 2.0);
+    gl.uniform1f(uOutlineWidth, isMouseOver ? 2.0 : 0.0); // Only show outline when mouse is over
     gl.uniform2i(uTextureSize, canvas.width, canvas.height);
     gl.uniform1f(uAlpha, 1.0);
 
@@ -455,20 +470,7 @@ function render(): void {
     gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // Read pixels after rendering but before requestAnimationFrame
-    const canvasRect = canvas.getBoundingClientRect();
-    let pixelX = Math.floor(currentMousePos.x - canvasRect.x);
-    let pixelY = Math.floor(canvas.height - (currentMousePos.y - canvasRect.y));
-    let pixelColor = new Uint8Array(4);
-    gl.readPixels(
-        pixelX, 
-        pixelY, 
-        1, 1, 
-        gl.RGBA, 
-        gl.UNSIGNED_BYTE, 
-        pixelColor
-    );
-    if (pixelColor[0] || pixelColor[1] || pixelColor[2]) {
+    if (isMouseOver) {
         // mouse over the character
         canvas.style.cursor = 'grab';
         canvas.style.pointerEvents = 'auto';
