@@ -16,6 +16,11 @@ let framebufferTexture: WebGLTexture;
 let outlineShader: WebGLProgram;
 let quadBuffer: WebGLBuffer;
 
+// Dragging
+let isDragging = false;
+let dragStartX = 0;
+let canvasStartLeft = 0;
+
 
 const RESOURCE_PATH = "assets/models/";
 
@@ -225,6 +230,11 @@ function init(): void {
     document.addEventListener('mousemove', handleMouseMove);
 
     initFramebuffer();
+
+    // Add drag event listeners
+    canvas.addEventListener('mousedown', handleDragStart);
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', handleDragEnd);
 }
 
 function initFramebuffer(): void {
@@ -391,8 +401,8 @@ function render(): void {
     skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
     
     // Move the canvas when "Move" animation is playing
-    if (character.currentAction.animation === "Move") {
-        const moveSpeed = 100; // pixels per second
+    if (character.currentAction.animation === "Move" && !isDragging) {
+        const moveSpeed = 40; // pixels per second
         const movement = moveSpeed * delta;
         if (character.currentAction.direction === "left") {
             canvas.style.left = (parseFloat(canvas.style.left || "0") - movement) + "px";
@@ -438,7 +448,7 @@ function render(): void {
         gl.UNSIGNED_BYTE, 
         pixelColor
     );
-    const isMouseOver = pixelColor[0] || pixelColor[1] || pixelColor[2];
+    const isMouseOver = pixelColor[0] || pixelColor[1] || pixelColor[2] || isDragging;
 
     // Second pass - render to screen with outline effect
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -549,6 +559,38 @@ function handleCanvasClick(): void {
         character.state.setAnimation(0, "Interact", false);
         console.log("Play action", character.currentAction);
     }
+}
+
+function handleDragStart(e: MouseEvent): void {
+    if (e.button === 0) { // Left click only
+        isDragging = true;
+        dragStartX = e.clientX;
+        canvasStartLeft = parseFloat(canvas.style.left || '0');
+        
+        // Pause any current animation
+        if (character && character.state) {
+            character.state.setAnimation(0, "Relax", true);
+            character.currentAction = {
+                animation: "Relax",
+                direction: character.currentAction.direction
+            };
+        }
+    }
+}
+
+function handleDrag(e: MouseEvent): void {
+    if (isDragging) {
+        const deltaX = e.clientX - dragStartX;
+        const newLeft = canvasStartLeft + deltaX;
+        
+        // Constrain to window bounds
+        const maxLeft = window.innerWidth - canvas.offsetWidth;
+        canvas.style.left = Math.max(0, Math.min(maxLeft, newLeft)) + 'px';
+    }
+}
+
+function handleDragEnd(): void {
+    isDragging = false;
 }
 
 window.addEventListener('load', init); 
