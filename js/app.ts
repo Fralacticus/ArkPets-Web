@@ -1,5 +1,6 @@
 import spine from '../libs/spine-webgl.js';
 import webgl = spine.webgl;
+import outlineFragmentShader from '../shaders/OutlineFragment.glsl';
 
 // Core variables
 let canvas: HTMLCanvasElement;
@@ -10,6 +11,10 @@ let mvp = new webgl.Matrix4();
 let assetManager: webgl.AssetManager;
 let skeletonRenderer: webgl.SkeletonRenderer;
 let lastFrameTime: number;
+let framebuffer: WebGLFramebuffer;
+let framebufferTexture: WebGLTexture;
+let outlineShader: WebGLProgram;
+let quadBuffer: WebGLBuffer;
 
 
 const RESOURCE_PATH = "assets/models/";
@@ -216,6 +221,78 @@ function init(): void {
     });
 
     document.addEventListener('mousemove', handleMouseMove);
+
+    initFramebuffer();
+}
+
+function initFramebuffer(): void {
+    // Create and bind framebuffer
+    framebuffer = gl.createFramebuffer()!;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+
+    // Create and bind texture
+    framebufferTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Attach texture to framebuffer
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, framebufferTexture, 0);
+
+    // Create quad buffer for second pass
+    quadBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,  // Bottom left
+         1, -1,  // Bottom right
+        -1,  1,  // Top left
+         1,  1   // Top right
+    ]), gl.STATIC_DRAW);
+
+    // Create and compile outline shader
+    const vertexShader = gl.createShader(gl.VERTEX_SHADER)!;
+    gl.shaderSource(vertexShader, `
+        attribute vec2 a_position;
+        varying vec2 v_texCoord;
+        void main() {
+            gl_Position = vec4(a_position, 0.0, 1.0);
+            v_texCoord = a_position * 0.5 + 0.5;
+        }
+    `);
+    gl.compileShader(vertexShader);
+
+    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fragmentShader, outlineFragmentShader);
+    gl.compileShader(fragmentShader);
+
+    // Add error checking for vertex shader compilation
+    gl.compileShader(vertexShader);
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error('Vertex shader compilation failed:');
+        console.error(gl.getShaderInfoLog(vertexShader));
+    }
+
+    // Add error checking for fragment shader compilation
+    gl.compileShader(fragmentShader);
+    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        console.error('Fragment shader compilation failed:');
+        console.error(gl.getShaderInfoLog(fragmentShader));
+    }
+
+    // Create and link program
+    outlineShader = gl.createProgram()!;
+    gl.attachShader(outlineShader, vertexShader);
+    gl.attachShader(outlineShader, fragmentShader);
+    gl.linkProgram(outlineShader);
+
+    // Add error checking for program linking
+    if (!gl.getProgramParameter(outlineShader, gl.LINK_STATUS)) {
+        console.error('Program linking failed:');
+        console.error(gl.getProgramInfoLog(outlineShader));
+    }
 }
 
 function load(): void {
@@ -300,13 +377,15 @@ function render(): void {
     const delta = now - lastFrameTime;
     lastFrameTime = now;
 
+    // First pass - render to framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const state = character.state;
     const skeleton = character.skeleton;
     
-    // Set the scale based on direction
     skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
     
     // Move the canvas when "Move" animation is playing
@@ -343,6 +422,38 @@ function render(): void {
     batcher.end();
 
     shader.unbind();
+
+    // Second pass - render to screen with outline effect
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(outlineShader);
+
+    // Set uniforms
+    const uTexture = gl.getUniformLocation(outlineShader, "u_texture");
+    const uOutlineColor = gl.getUniformLocation(outlineShader, "u_outlineColor");
+    const uOutlineWidth = gl.getUniformLocation(outlineShader, "u_outlineWidth");
+    const uTextureSize = gl.getUniformLocation(outlineShader, "u_textureSize");
+    const uAlpha = gl.getUniformLocation(outlineShader, "u_alpha");
+
+    gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
+    gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
+    gl.uniform1f(uOutlineWidth, 2.0);
+    gl.uniform2i(uTextureSize, canvas.width, canvas.height);
+    gl.uniform1f(uAlpha, 1.0);
+
+    // Bind framebuffer texture
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
+
+    // Draw quad
+    const aPosition = gl.getAttribLocation(outlineShader, "a_position");
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     // Read pixels after rendering but before requestAnimationFrame
     const canvasRect = canvas.getBoundingClientRect();
@@ -385,6 +496,10 @@ function resize(): void {
     // Position the skeleton at the center of the canvas
     character.skeleton.x = canvas.width / 2;
     character.skeleton.y = 0;
+
+    // Update framebuffer texture size
+    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 }
 
 function randomPick(probabilities: number[]): number {
