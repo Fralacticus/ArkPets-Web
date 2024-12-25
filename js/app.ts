@@ -128,7 +128,6 @@ function createContextMenu() {
         applyMenuItemStyles(item);
         item.onclick = () => {
             menu.style.display = 'none';
-            // TODO: Implement character switching
             assetManager.removeAll();
             assetManager.loadBinary(char.skeleton);
             assetManager.loadTextureAtlas(char.atlas);
@@ -153,7 +152,7 @@ function createContextMenu() {
     aboutMenu.style.cursor = 'pointer';
     aboutMenu.onclick = () => {
         menu.style.display = 'none';
-        // TODO: Implement about menu
+        window.open('https://github.com/fuyufjh/ArkPets-Web/', '_blank');
     };
 
     // Apply to About menu
@@ -472,11 +471,9 @@ function render(): void {
 
     if (isMouseOver) {
         // mouse over the character
-        canvas.style.cursor = 'grab';
         canvas.style.pointerEvents = 'auto';
     } else {
         // mouse not over the character
-        canvas.style.cursor = 'default';
         canvas.style.pointerEvents = 'none';
     }
     requestAnimationFrame(render);

@@ -5,16 +5,46 @@
     <title>Spine Animation</title>
     <style>
         * { margin: 0; padding: 0; }
-        body, html { height: 100% }
+        body, html { 
+            height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            padding: 2rem 0;
+            color: #2c3e50;
+            font-size: 2.5rem;
+        }
+        p {
+            margin: 1rem 2rem;
+            text-align: justify;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
         canvas { 
             position: absolute;
             bottom: 0;
             left: 0;
+            z-index: 100;
+        }
+        #contextMenu {
+            font-size: 0.9rem;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
     <h1>Arkpets-Web</h1>
+    <p>Lorem ipsum odor amet, consectetuer adipiscing elit. Odio sollicitudin est potenti ultrices dapibus consectetur. Elit ultricies natoque taciti libero magna ex dignissim. Montes felis sem urna habitasse purus taciti elit. Luctus litora ipsum donec taciti ullamcorper lacus semper. Amet sed massa luctus ridiculus platea at per. Justo consequat vulputate ut, per eleifend montes nostra penatibus.
+    <p>Congue donec lectus, augue torquent nostra at tincidunt arcu. Libero auctor egestas vivamus maecenas potenti commodo. Vestibulum urna dictum duis mollis interdum proin sed. Lectus suscipit lorem varius semper dictum porta. Mattis semper fames massa eget fringilla bibendum ex. Varius iaculis mollis montes convallis velit vehicula.
+    <p>Donec vulputate aptent maecenas ex litora. Ac torquent eleifend habitant dapibus penatibus auctor. Maximus natoque a quis ante inceptos conubia. Enim sociosqu platea risus phasellus; id in magnis laoreet dictum. Ornare facilisis vivamus consequat parturient tortor sodales; nibh hac consequat? Orci odio vivamus sollicitudin etiam, morbi hendrerit sem nisi. Posuere sit felis quisque nisi sit sed. Fermentum nisi nisi elementum sit senectus nibh efficitur purus.
+    <p>Cursus placerat risus lectus eros sociosqu natoque ligula. Vestibulum tortor platea tempus ut ornare class. Etiam phasellus in ac praesent sapien. Interdum leo cras; habitasse praesent pellentesque eget accumsan pharetra. Rutrum inceptos donec potenti hendrerit ac integer cursus? Eleifend fringilla sagittis dis purus aliquam. Ultricies dis ligula lacus erat, ad taciti. Curabitur scelerisque commodo cursus fusce vel lectus. Himenaeos aptent imperdiet dis nunc habitant. Phasellus feugiat platea vel facilisi per aptent.
+    <p>Lectus suscipit etiam nunc malesuada duis eros orci. Faucibus donec sociosqu semper vel ligula sociosqu aliquam. Eros suscipit potenti morbi urna ante quis egestas dui. Posuere aliquet phasellus interdum primis in commodo. Nisl class arcu sit libero; rhoncus curae litora. Pulvinar vestibulum sem viverra pulvinar tortor rutrum per ipsum. Ullamcorper tristique mollis lobortis ipsum cras, conubia sit eu!
     <canvas id="canvas" width="400" height="400"></canvas>
     <script src="dist/bundle.js"></script>
 </body>
