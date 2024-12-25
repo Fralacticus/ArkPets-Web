@@ -19,6 +19,9 @@ let quadBuffer: WebGLBuffer;
 
 const RESOURCE_PATH = "assets/models/";
 
+// Supersampling is necessary for high-res display
+const SUPERSAMPLE_FACTOR = 2;
+
 interface CharacterResource {
     name: string;
     skeleton: string;
@@ -296,7 +299,7 @@ function initFramebuffer(): void {
 
 function load(): void {
     if (assetManager.isLoadingComplete()) {
-        character = loadCharacter(characterResource, 0.3 * 0.75);
+        character = loadCharacter(characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
         lastFrameTime = Date.now() / 1000;
         
         resize();
@@ -363,7 +366,7 @@ function calculateSetupPoseBounds(skeleton: spine.Skeleton) {
     return { offset, size };
 }
 
-// Mouse position (Client)
+// Mouse position (client, no transform, no supersampling)
 let currentMousePos = { x: 0, y: 0 };
 
 function handleMouseMove(event: MouseEvent): void {
@@ -424,8 +427,8 @@ function render(): void {
 
     // Read pixels before second pass to determine if mouse is over character
     const canvasRect = canvas.getBoundingClientRect();
-    let pixelX = Math.floor(currentMousePos.x - canvasRect.x);
-    let pixelY = Math.floor(canvas.height - (currentMousePos.y - canvasRect.y));
+    let pixelX = (currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
+    let pixelY = canvas.height - (currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
     let pixelColor = new Uint8Array(4);
     gl.readPixels(
         pixelX, 
@@ -483,16 +486,20 @@ function resize(): void {
     // Get the minimum required width and height based on character bounds
     const minWidth = character.bounds.size.x * 2;
     const minHeight = character.bounds.size.y * 1.2;
-
-    // Set canvas size to the larger of window size or minimum required size
+    
+    // Set canvas display size
+    canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
+    canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
+    
+    // Set canvas internal resolution
     canvas.width = minWidth;
     canvas.height = minHeight;
     
-    // Center the character in the canvas
+    // Update the projection matrix to match the new resolution
     mvp.ortho2d(0, 0, canvas.width, canvas.height);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
-    // Position the skeleton at the center of the canvas
+    // Scale up the skeleton position to match the higher resolution
     character.skeleton.x = canvas.width / 2;
     character.skeleton.y = 0;
 
