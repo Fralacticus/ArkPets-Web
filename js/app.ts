@@ -165,11 +165,40 @@ function createContextMenu() {
 
     // Apply to About menu
     applyMenuItemStyles(aboutMenu);
+
+    // Create Hide menu item
+    const hideMenu = document.createElement('div');
+    hideMenu.className = 'menu-item';
+    hideMenu.innerHTML = 'Hide';
+    hideMenu.onclick = () => {
+        menu.style.display = 'none';
+        hideCharacter();
+    };
+
+    // Apply to Hide menu
+    applyMenuItemStyles(hideMenu);
     
     menu.appendChild(charactersMenu);
+    menu.appendChild(hideMenu);
     menu.appendChild(aboutMenu);
     document.body.appendChild(menu);
     return menu;
+}
+
+function hideCharacter(): void {
+    if (canvas) {
+        // Fade out animation
+        let opacity = 1;
+        const fadeInterval = setInterval(() => {
+            opacity -= 0.1;
+            canvas.style.opacity = opacity.toString();
+            
+            if (opacity <= 0) {
+                clearInterval(fadeInterval);
+                canvas.style.display = 'none';
+            }
+        }, 30);
+    }
 }
 
 function init(): void {
@@ -213,9 +242,14 @@ function init(): void {
         e.preventDefault();
         const menu = document.getElementById('contextMenu');
         if (menu) {
+            // Temporarily make menu visible but transparent to measure dimensions
+            menu.style.opacity = '0';
             menu.style.display = 'block';
-            menu.style.left = e.pageX + 'px';
-            menu.style.top = e.pageY + 'px';
+            const { innerWidth, innerHeight } = window;
+            const { offsetWidth, offsetHeight } = menu;
+            menu.style.left = Math.min(e.pageX, innerWidth - offsetWidth) + 'px';
+            menu.style.top = Math.min(e.pageY, innerHeight - offsetHeight) + 'px';
+            menu.style.opacity = '1';
         }
     });
     
