@@ -296,7 +296,7 @@ function initFramebuffer(): void {
 
 function load(): void {
     if (assetManager.isLoadingComplete()) {
-        character = loadCharacter();
+        character = loadCharacter(characterResource, 0.3 * 0.75);
         lastFrameTime = Date.now() / 1000;
         
         resize();
@@ -308,13 +308,13 @@ function load(): void {
     }
 }
 
-function loadCharacter(): Character {    
-    const atlas = assetManager.get(characterResource.atlas);
+function loadCharacter(resource: CharacterResource, scale: number = 1.0): Character {    
+    const atlas = assetManager.get(resource.atlas);
     const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
     const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
 
-    skeletonBinary.scale = 1;
-    const skeletonData = skeletonBinary.readSkeletonData(assetManager.get(characterResource.skeleton));
+    skeletonBinary.scale = scale;
+    const skeletonData = skeletonBinary.readSkeletonData(assetManager.get(resource.skeleton));
     const skeleton = new spine.Skeleton(skeletonData);
     const bounds = calculateSetupPoseBounds(skeleton);
 
