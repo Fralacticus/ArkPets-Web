@@ -163,7 +163,8 @@ function createContextMenu() {
 function init(): void {
     // Setup canvas and WebGL context
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
-
+    canvas.style.pointerEvents = "none";
+    
     gl = canvas.getContext("webgl", {
         alpha: true,
         premultipliedAlpha: false
@@ -213,6 +214,8 @@ function init(): void {
             menu.style.display = 'none';
         }
     });
+
+    document.addEventListener('mousemove', handleMouseMove);
 }
 
 function load(): void {
@@ -284,6 +287,14 @@ function calculateSetupPoseBounds(skeleton: spine.Skeleton) {
     return { offset, size };
 }
 
+// Mouse position (Client)
+let currentMousePos = { x: 0, y: 0 };
+
+function handleMouseMove(event: MouseEvent): void {
+    currentMousePos.x = event.clientX;
+    currentMousePos.y = event.clientY;
+}
+
 function render(): void {
     const now = Date.now() / 1000;
     const delta = now - lastFrameTime;
@@ -333,6 +344,28 @@ function render(): void {
 
     shader.unbind();
 
+    // Read pixels after rendering but before requestAnimationFrame
+    const canvasRect = canvas.getBoundingClientRect();
+    let pixelX = Math.floor(currentMousePos.x - canvasRect.x);
+    let pixelY = Math.floor(canvas.height - (currentMousePos.y - canvasRect.y));
+    let pixelColor = new Uint8Array(4);
+    gl.readPixels(
+        pixelX, 
+        pixelY, 
+        1, 1, 
+        gl.RGBA, 
+        gl.UNSIGNED_BYTE, 
+        pixelColor
+    );
+    if (pixelColor[0] || pixelColor[1] || pixelColor[2]) {
+        // mouse over the character
+        canvas.style.cursor = 'grab';
+        canvas.style.pointerEvents = 'auto';
+    } else {
+        // mouse not over the character
+        canvas.style.cursor = 'default';
+        canvas.style.pointerEvents = 'none';
+    }
     requestAnimationFrame(render);
 }
 
