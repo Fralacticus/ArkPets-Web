@@ -18,8 +18,7 @@ let quadBuffer: WebGLBuffer;
 
 // Dragging
 let isDragging = false;
-let dragStartX = 0;
-let canvasStartLeft = 0;
+let dragStartRelativeX = 0;
 
 
 const RESOURCE_PATH = "assets/models/";
@@ -59,6 +58,9 @@ interface Character {
         size: spine.Vector2;
     };
     currentAction: Action;
+    position: {
+        x: number; // pixels
+    };
 }
 
 type Direction = "left" | "right";
@@ -447,6 +449,9 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
             animation: "Relax",
             direction: "right",
         },
+        position: {
+            x: 0  // Initialize at left edge
+        }
     };
 }
 
@@ -488,16 +493,19 @@ function render(): void {
         const moveSpeed = 30; // pixels per second
         const movement = moveSpeed * delta;
         if (character.currentAction.direction === "left") {
-            canvas.style.left = (parseFloat(canvas.style.left || "0") - movement) + "px";
+            character.position.x = Math.max(0, character.position.x - movement);
+            canvas.style.left = character.position.x + "px";
             // Turn around when reaching left edge
-            if (parseFloat(canvas.style.left) <= 0) {
-                canvas.style.left = "0px";
+            if (character.position.x <= 0) {
+                character.position.x = 0;
                 character.currentAction.direction = "right";
             }
         } else {
-            canvas.style.left = (parseFloat(canvas.style.left || "0") + movement) + "px";
+            character.position.x = character.position.x + movement;
+            canvas.style.left = character.position.x + "px";
             // Turn around when reaching right edge
-            if (parseFloat(canvas.style.left) + canvas.width >= window.innerWidth) {
+            if (character.position.x >= window.innerWidth - canvas.width) {
+                character.position.x = window.innerWidth - canvas.width;
                 character.currentAction.direction = "left";
             }
         }
@@ -647,8 +655,7 @@ function handleCanvasClick(): void {
 function handleDragStart(e: MouseEvent): void {
     if (e.button === 0) { // Left click only
         isDragging = true;
-        dragStartX = e.clientX;
-        canvasStartLeft = parseFloat(canvas.style.left || '0');
+        dragStartRelativeX = e.clientX - character.position.x;
         
         // Pause any current animation
         if (character && character.state) {
@@ -663,12 +670,12 @@ function handleDragStart(e: MouseEvent): void {
 
 function handleDrag(e: MouseEvent): void {
     if (isDragging) {
-        const deltaX = e.clientX - dragStartX;
-        const newLeft = canvasStartLeft + deltaX;
+        const newLeft = e.clientX - dragStartRelativeX;
         
         // Constrain to window bounds
         const maxLeft = window.innerWidth - canvas.offsetWidth;
-        canvas.style.left = Math.max(0, Math.min(maxLeft, newLeft)) + 'px';
+        character.position.x = Math.max(0, Math.min(maxLeft, newLeft));
+        canvas.style.left = character.position.x + 'px';
     }
 }
 
