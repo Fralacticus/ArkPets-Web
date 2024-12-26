@@ -5,7 +5,7 @@ import outlineVertexShader from '../shaders/OutlineVertex.glsl';
 import { createContextMenu, hideContextMenu, showContextMenu } from './menu';
 import { CharacterResource } from './types';
 
-// Core variables
+// Rendering
 let canvas: HTMLCanvasElement;
 let gl: WebGLRenderingContext;
 let shader: webgl.Shader;
@@ -18,6 +18,9 @@ let framebuffer: WebGLFramebuffer;
 let framebufferTexture: WebGLTexture;
 let outlineShader: WebGLProgram;
 let quadBuffer: WebGLBuffer;
+
+// Supersampling is necessary for high-res display
+const SUPERSAMPLE_FACTOR = 2;
 
 // Dragging
 let isMouseOver = false;
@@ -37,9 +40,6 @@ const MIN_VELOCITY = 5; // threshold for stopping
 const BOUNCE_DAMPING = 0.7; // energy loss on bounce
 
 const RESOURCE_PATH = "/assets/models/";
-
-// Supersampling is necessary for high-res display
-const SUPERSAMPLE_FACTOR = 2;
 
 const CHARACTER_RESOURCES: CharacterResource[] = [
     {
@@ -220,25 +220,19 @@ function initFramebuffer(): void {
     gl.shaderSource(fragmentShader, outlineFragmentShader);
     gl.compileShader(fragmentShader);
 
-    // Add error checking for vertex shader compilation
+    // Compile shaders
     gl.compileShader(vertexShader);
     if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
         console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
     }
-
-    // Add error checking for fragment shader compilation
     gl.compileShader(fragmentShader);
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
         console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
     }
-
-    // Create and link program
     outlineShader = gl.createProgram()!;
     gl.attachShader(outlineShader, vertexShader);
     gl.attachShader(outlineShader, fragmentShader);
     gl.linkProgram(outlineShader);
-
-    // Add error checking for program linking
     if (!gl.getProgramParameter(outlineShader, gl.LINK_STATUS)) {
         console.error('Program linking failed:', gl.getProgramInfoLog(outlineShader));
     }
@@ -544,7 +538,6 @@ function handleDragStart(e: DragEvent): void {
     if ((e as MouseEvent).button === undefined || (e as MouseEvent).button === 0) {
         isDragging = true;
         
-        // Get coordinates regardless of event type
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
         dragStartRelativeX = clientX - position.x;
@@ -563,14 +556,11 @@ function handleDragStart(e: DragEvent): void {
 
 function handleDrag(e: DragEvent): void {
     if (isDragging) {
-        // Get coordinates regardless of event type
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
         
         const oldX = position.x;
         const oldY = position.y;
-        
-        // Update position
         const newX = clientX - dragStartRelativeX;
         const newY = clientY - dragStartRelativeY;
         
@@ -586,8 +576,6 @@ function handleDrag(e: DragEvent): void {
         // Update position
         position.x = newX;
         position.y = newY;
-        
-        // Update canvas position
         canvas.style.left = position.x + 'px';
         canvas.style.top = position.y + 'px';
         
