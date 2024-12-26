@@ -232,11 +232,9 @@ function init(): void {
 
     window.addEventListener('resize', (e) => {
         if (canvas) {
-            const maxLeft = window.innerWidth - canvas.offsetWidth;
-            const currentLeft = parseFloat(canvas.style.left || '0');
-            
             // Constrain to window bounds
-            canvas.style.left = Math.max(0, Math.min(maxLeft, currentLeft)) + 'px';
+            const maxLeft = window.innerWidth - canvas.offsetWidth;
+            position.x = Math.max(0, Math.min(maxLeft, position.x));
         }
     });
 }
@@ -451,10 +449,6 @@ function render(): void {
             position.y = maxY;
             velocity.y = 0;
         }
-        
-        // Update canvas position
-        canvas.style.left = position.x + 'px';
-        canvas.style.top = position.y + 'px';
     }
 
     // First pass - render to framebuffer
@@ -474,7 +468,6 @@ function render(): void {
         const movement = moveSpeed * delta;
         if (character.currentAction.direction === "left") {
             position.x = Math.max(0, position.x - movement);
-            canvas.style.left = position.x + "px";
             // Turn around when reaching left edge
             if (position.x <= 0) {
                 position.x = 0;
@@ -482,7 +475,6 @@ function render(): void {
             }
         } else {
             position.x = position.x + movement;
-            canvas.style.left = position.x + "px";
             // Turn around when reaching right edge
             if (position.x >= window.innerWidth - canvas.width) {
                 position.x = window.innerWidth - canvas.width;
@@ -490,6 +482,9 @@ function render(): void {
             }
         }
     }
+
+    canvas.style.left = position.x + "px";
+    canvas.style.top = position.y + "px";
     
     state.update(delta);
     state.apply(skeleton);
