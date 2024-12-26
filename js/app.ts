@@ -2,7 +2,7 @@ import spine from '../libs/spine-webgl.js';
 import webgl = spine.webgl;
 import outlineFragmentShader from '../shaders/OutlineFragment.glsl';
 import outlineVertexShader from '../shaders/OutlineVertex.glsl';
-import { createContextMenu } from './menu';
+import { createContextMenu, showContextMenu } from './menu';
 import { CharacterResource } from './types';
 
 // Core variables
@@ -20,10 +20,13 @@ let outlineShader: WebGLProgram;
 let quadBuffer: WebGLBuffer;
 
 // Dragging
+let isMouseOver = false;
 let isDragging = false;
 let dragStartRelativeX = 0;
 let dragStartRelativeY = 0;
 let lastDragEvent: MouseEvent | null = null;
+
+const MOVING_SPEED = 30; // pixels per second
 
 // Physicsal motion
 let velocity = { x: 0, y: 0 };
@@ -131,6 +134,9 @@ function init(): void {
     // Set up blending for non-premultiplied alpha
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    
+    // Initialize framebuffer for 2-pass rendering
+    initFramebuffer();
 
     // Create WebGL objects
     shader = webgl.Shader.newTwoColoredTextured(gl);
@@ -139,13 +145,10 @@ function init(): void {
     assetManager = new webgl.AssetManager(gl, RESOURCE_PATH);
 
     // Load assets for initial character
-    assetManager.loadBinary(characterResource.skeleton);
-    assetManager.loadTextureAtlas(characterResource.atlas);
+    setCharacterResource(CHARACTER_RESOURCES[0]);
 
     // Add click event listener to canvas
     canvas.addEventListener('click', handleCanvasClick);
-
-    requestAnimationFrame(load);
 
     const contextMenu = createContextMenu(
         CHARACTER_RESOURCES,
@@ -156,27 +159,6 @@ function init(): void {
     // Add context menu event listeners
     let longPressTimer: number;
     let isLongPress = false;
-
-    // Helper function to show menu
-    const showContextMenu = (e: MouseEvent | TouchEvent) => {
-        e.preventDefault();
-        const menu = document.getElementById('arkpets-menu');
-        if (menu) {
-            // Temporarily make menu visible but transparent to measure dimensions
-            menu.style.opacity = '0';
-            menu.style.display = 'block';
-            const { innerWidth, innerHeight } = window;
-            const { offsetWidth, offsetHeight } = menu;
-            
-            // Get coordinates based on event type
-            const pageX = 'touches' in e ? e.touches[0].pageX : (e as MouseEvent).pageX;
-            const pageY = 'touches' in e ? e.touches[0].pageY : (e as MouseEvent).pageY;
-            
-            menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
-            menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
-            menu.style.opacity = '1';
-        }
-    };
 
     // Handle desktop right click
     canvas.addEventListener('contextmenu', showContextMenu);
@@ -217,8 +199,6 @@ function init(): void {
     });
 
     document.addEventListener('mousemove', handleMouseMove);
-
-    initFramebuffer();
 
     // Mouse events
     canvas.addEventListener('mousedown', handleDragStart);
@@ -278,15 +258,13 @@ function initFramebuffer(): void {
     // Add error checking for vertex shader compilation
     gl.compileShader(vertexShader);
     if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error('Vertex shader compilation failed:');
-        console.error(gl.getShaderInfoLog(vertexShader));
+        console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
     }
 
     // Add error checking for fragment shader compilation
     gl.compileShader(fragmentShader);
     if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error('Fragment shader compilation failed:');
-        console.error(gl.getShaderInfoLog(fragmentShader));
+        console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
     }
 
     // Create and link program
@@ -297,8 +275,7 @@ function initFramebuffer(): void {
 
     // Add error checking for program linking
     if (!gl.getProgramParameter(outlineShader, gl.LINK_STATUS)) {
-        console.error('Program linking failed:');
-        console.error(gl.getProgramInfoLog(outlineShader));
+        console.error('Program linking failed:', gl.getProgramInfoLog(outlineShader));
     }
 }
 
@@ -451,21 +428,9 @@ function render(): void {
         }
     }
 
-    // First pass - render to framebuffer
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    const state = character.state;
-    const skeleton = character.skeleton;
-    
-    skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
-    
     // Move the canvas when "Move" animation is playing
     if (character.currentAction.animation === "Move" && !isDragging) {
-        const moveSpeed = 30; // pixels per second
-        const movement = moveSpeed * delta;
+        const movement = MOVING_SPEED * delta;
         if (character.currentAction.direction === "left") {
             position.x = Math.max(0, position.x - movement);
             // Turn around when reaching left edge
@@ -483,12 +448,21 @@ function render(): void {
         }
     }
 
+    // Update canvas position to `position`
     canvas.style.left = position.x + "px";
     canvas.style.top = position.y + "px";
+
+    // 1st pass - render Spine character to framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     
-    state.update(delta);
-    state.apply(skeleton);
-    skeleton.updateWorldTransform();
+    character.skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
+
+    character.state.update(delta);
+    character.state.apply(character.skeleton);
+    character.skeleton.updateWorldTransform();
 
     shader.bind();
     shader.setUniformi(webgl.Shader.SAMPLER, 0);
@@ -496,12 +470,12 @@ function render(): void {
 
     batcher.begin(shader);
     skeletonRenderer.premultipliedAlpha = false;
-    skeletonRenderer.draw(batcher, skeleton);
+    skeletonRenderer.draw(batcher, character.skeleton);
     batcher.end();
 
     shader.unbind();
 
-    // Read pixels before second pass to determine if mouse is over character
+    // Read pixels before 2nd pass to determine if mouse is over character
     const canvasRect = canvas.getBoundingClientRect();
     let pixelX = (currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
     let pixelY = canvas.height - (currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
@@ -514,9 +488,15 @@ function render(): void {
         gl.UNSIGNED_BYTE, 
         pixelColor
     );
-    const isMouseOver = pixelColor[0] || pixelColor[1] || pixelColor[2] || isDragging;
+    isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0 || isDragging;
+    if (isMouseOver) {
+        canvas.style.pointerEvents = 'auto';
+    } else {
+        // Disable any mouse interaction so that the webpage content can be selected
+        canvas.style.pointerEvents = 'none';
+    }
 
-    // Second pass - render to screen with outline effect
+    // 2nd pass - render to screen with outline effect
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
@@ -533,7 +513,7 @@ function render(): void {
 
     gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
     gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
-    gl.uniform1f(uOutlineWidth, isMouseOver ? 2.0 : 0.0); // Only show outline when mouse is over
+    gl.uniform1f(uOutlineWidth, isMouseOver ? 2.0 : 0.0); // Show outline when mouse is over
     gl.uniform2i(uTextureSize, canvas.width, canvas.height);
     gl.uniform1f(uAlpha, 1.0);
 
@@ -541,20 +521,13 @@ function render(): void {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
 
-    // Draw quad
+    // Draw quad to canvas
     const aPosition = gl.getAttribLocation(outlineShader, "a_position");
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.enableVertexAttribArray(aPosition);
     gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    if (isMouseOver) {
-        // mouse over the character
-        canvas.style.pointerEvents = 'auto';
-    } else {
-        // mouse not over the character
-        canvas.style.pointerEvents = 'none';
-    }
     requestAnimationFrame(render);
 }
 
