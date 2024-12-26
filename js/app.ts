@@ -30,7 +30,7 @@ const MAX_VELOCITY = 1000; // maximum velocity in pixels per second
 const MIN_VELOCITY = 5; // threshold for stopping
 const BOUNCE_DAMPING = 0.7; // energy loss on bounce
 
-const RESOURCE_PATH = "assets/models/";
+const RESOURCE_PATH = "/assets/models/";
 
 // Supersampling is necessary for high-res display
 const SUPERSAMPLE_FACTOR = 2;
