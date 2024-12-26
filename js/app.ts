@@ -19,6 +19,7 @@ let quadBuffer: WebGLBuffer;
 // Dragging
 let isDragging = false;
 let dragStartRelativeX = 0;
+let dragStartRelativeY = 0;
 let lastDragEvent: MouseEvent | null = null;
 
 // Physicsal motion
@@ -722,7 +723,9 @@ function handleDragStart(e: DragEvent): void {
         
         // Get coordinates regardless of event type
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
         dragStartRelativeX = clientX - character.position.x;
+        dragStartRelativeY = clientY - character.position.y;
         
         // Pause any current animation
         if (character && character.state) {
@@ -746,7 +749,7 @@ function handleDrag(e: DragEvent): void {
         
         // Update position
         const newX = clientX - dragStartRelativeX;
-        const newY = clientY - canvas.offsetHeight / 2;
+        const newY = clientY - dragStartRelativeY;
         
         // Calculate velocity based on time between events
         if (lastDragEvent) {
