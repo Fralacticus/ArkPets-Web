@@ -2,7 +2,7 @@ import spine from '../libs/spine-webgl.js';
 import webgl = spine.webgl;
 import outlineFragmentShader from '../shaders/OutlineFragment.glsl';
 import outlineVertexShader from '../shaders/OutlineVertex.glsl';
-import { createContextMenu, showContextMenu } from './menu';
+import { createContextMenu, hideContextMenu, showContextMenu } from './menu';
 import { CharacterResource } from './types';
 
 // Core variables
@@ -30,7 +30,7 @@ const MOVING_SPEED = 30; // pixels per second
 
 // Physicsal motion
 let velocity = { x: 0, y: 0 };
-const GRAVITY = 980; // pixels per second squared
+const GRAVITY = 1000; // pixels per second squared
 const DRAG = 0.98; // air resistance
 const MAX_VELOCITY = 1000; // maximum velocity in pixels per second
 const MIN_VELOCITY = 5; // threshold for stopping
@@ -155,57 +155,22 @@ function init(): void {
         setCharacterResource,
         hideCharacter
     );
-    
-    // Add context menu event listeners
-    let longPressTimer: number;
-    let isLongPress = false;
 
     // Handle desktop right click
     canvas.addEventListener('contextmenu', showContextMenu);
-
-    // Handle mobile long press
-    canvas.addEventListener('touchstart', (e) => {
-        isLongPress = false;
-        longPressTimer = window.setTimeout(() => {
-            isLongPress = true;
-            showContextMenu(e);
-        }, 500); // 500ms for long press
-    });
-
-    canvas.addEventListener('touchend', () => {
-        clearTimeout(longPressTimer);
-    });
-
-    canvas.addEventListener('touchmove', () => {
-        clearTimeout(longPressTimer);
-    });
     
-    // Hide menu when clicking/touching outside
-    document.addEventListener('click', (e) => {
-        const menu = document.getElementById('arkpets-menu');
-        if (menu) {
-            menu.style.display = 'none';
-        }
-    });
+    // Hide menu when clicking outside
+    document.addEventListener('click', hideContextMenu);
 
-    document.addEventListener('touchstart', (e) => {
-        if (!isLongPress) {
-            const menu = document.getElementById('arkpets-menu');
-            if (menu) {
-                menu.style.display = 'none';
-            }
-        }
-        isLongPress = false;
-    });
-
+    // Mouse events for detecting mouse-over effect
     document.addEventListener('mousemove', handleMouseMove);
 
-    // Mouse events
+    // Mouse events for dragging
     canvas.addEventListener('mousedown', handleDragStart);
     document.addEventListener('mousemove', handleDrag);
     document.addEventListener('mouseup', handleDragEnd);
 
-    // Touch events
+    // Touch events for dragging
     canvas.addEventListener('touchstart', handleDragStart);
     document.addEventListener('touchmove', handleDrag);
     document.addEventListener('touchend', handleDragEnd);
