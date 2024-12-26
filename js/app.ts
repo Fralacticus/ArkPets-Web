@@ -308,6 +308,16 @@ function init(): void {
     canvas.addEventListener('mousedown', handleDragStart);
     document.addEventListener('mousemove', handleDrag);
     document.addEventListener('mouseup', handleDragEnd);
+
+    window.addEventListener('resize', (e) => {
+        if (canvas) {
+            const maxLeft = window.innerWidth - canvas.offsetWidth;
+            const currentLeft = parseFloat(canvas.style.left || '0');
+            
+            // Constrain to window bounds
+            canvas.style.left = Math.max(0, Math.min(maxLeft, currentLeft)) + 'px';
+        }
+    });
 }
 
 function initFramebuffer(): void {
@@ -475,7 +485,7 @@ function render(): void {
     
     // Move the canvas when "Move" animation is playing
     if (character.currentAction.animation === "Move" && !isDragging) {
-        const moveSpeed = 40; // pixels per second
+        const moveSpeed = 30; // pixels per second
         const movement = moveSpeed * delta;
         if (character.currentAction.direction === "left") {
             canvas.style.left = (parseFloat(canvas.style.left || "0") - movement) + "px";
