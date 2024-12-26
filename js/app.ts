@@ -212,6 +212,8 @@ function hideCharacter(): void {
     }
 }
 
+type DragEvent = MouseEvent | TouchEvent;
+
 function init(): void {
     // Setup canvas and WebGL context
     canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -315,10 +317,15 @@ function init(): void {
 
     initFramebuffer();
 
-    // Add drag event listeners
+    // Mouse events
     canvas.addEventListener('mousedown', handleDragStart);
     document.addEventListener('mousemove', handleDrag);
     document.addEventListener('mouseup', handleDragEnd);
+
+    // Touch events
+    canvas.addEventListener('touchstart', handleDragStart);
+    document.addEventListener('touchmove', handleDrag);
+    document.addEventListener('touchend', handleDragEnd);
 
     window.addEventListener('resize', (e) => {
         if (canvas) {
@@ -708,10 +715,14 @@ function handleCanvasClick(): void {
     }
 }
 
-function handleDragStart(e: MouseEvent): void {
-    if (e.button === 0) { // Left click only
+
+function handleDragStart(e: DragEvent): void {
+    if ((e as MouseEvent).button === undefined || (e as MouseEvent).button === 0) {
         isDragging = true;
-        dragStartRelativeX = e.clientX - character.position.x;
+        
+        // Get coordinates regardless of event type
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+        dragStartRelativeX = clientX - character.position.x;
         
         // Pause any current animation
         if (character && character.state) {
@@ -724,19 +735,23 @@ function handleDragStart(e: MouseEvent): void {
     }
 }
 
-function handleDrag(e: MouseEvent): void {
+function handleDrag(e: DragEvent): void {
     if (isDragging) {
+        // Get coordinates regardless of event type
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+        
         const oldX = character.position.x;
         const oldY = character.position.y;
         
         // Update position
-        const newX = e.clientX - dragStartRelativeX;
-        const newY = e.clientY - canvas.offsetHeight / 2;
+        const newX = clientX - dragStartRelativeX;
+        const newY = clientY - canvas.offsetHeight / 2;
         
         // Calculate velocity based on time between events
         if (lastDragEvent) {
-            const dt = (e.timeStamp - lastDragEvent.timeStamp) / 1000; // Convert to seconds
-            if (dt > 0) { // Prevent division by zero
+            const dt = (e.timeStamp - lastDragEvent.timeStamp) / 1000;
+            if (dt > 0) {
                 velocity.x = (newX - oldX) / dt;
                 velocity.y = (newY - oldY) / dt;
             }
@@ -750,7 +765,12 @@ function handleDrag(e: MouseEvent): void {
         canvas.style.left = character.position.x + 'px';
         canvas.style.top = character.position.y + 'px';
         
-        lastDragEvent = e;
+        lastDragEvent = e as MouseEvent;
+        
+        // Prevent scrolling on mobile
+        if ('touches' in e) {
+            e.preventDefault();
+        }
     }
 }
 
