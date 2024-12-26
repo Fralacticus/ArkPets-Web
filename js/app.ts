@@ -394,7 +394,7 @@ function render(): void {
     }
 
     // Move the canvas when "Move" animation is playing
-    if (character.currentAction.animation === "Move" && !isDragging) {
+    if (character.currentAction.animation === "Move") {
         const movement = MOVING_SPEED * delta;
         if (character.currentAction.direction === "left") {
             position.x = Math.max(0, position.x - movement);
@@ -453,7 +453,7 @@ function render(): void {
         gl.UNSIGNED_BYTE, 
         pixelColor
     );
-    isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0 || isDragging;
+    isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0;
     if (isMouseOver) {
         canvas.style.pointerEvents = 'auto';
     } else {
