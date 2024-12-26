@@ -19,7 +19,15 @@ let quadBuffer: WebGLBuffer;
 // Dragging
 let isDragging = false;
 let dragStartRelativeX = 0;
+let lastDragEvent: MouseEvent | null = null;
 
+// Physicsal motion
+let velocity = { x: 0, y: 0 };
+const GRAVITY = 980; // pixels per second squared
+const DRAG = 0.98; // air resistance
+const MAX_VELOCITY = 1000; // maximum velocity in pixels per second
+const MIN_VELOCITY = 5; // threshold for stopping
+const BOUNCE_DAMPING = 0.7; // energy loss on bounce
 
 const RESOURCE_PATH = "assets/models/";
 
@@ -59,7 +67,8 @@ interface Character {
     };
     currentAction: Action;
     position: {
-        x: number; // pixels
+        x: number;
+        y: number; // Add y position
     };
 }
 
@@ -397,8 +406,6 @@ function load(): void {
         character = loadCharacter(characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
         lastFrameTime = Date.now() / 1000;
         
-        resize();
-
         requestAnimationFrame(render);
     } else {
         console.log("Loading assets of character", characterResource.name, "progress", assetManager.getLoaded(), "/", assetManager.getToLoad());
@@ -441,6 +448,30 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
     }
     animationState.addListener(new AnimationStateAdapter());
 
+    // Get the minimum required width and height based on character bounds
+    const minWidth = bounds.size.x * 2;
+    const minHeight = bounds.size.y * 1.2;
+    
+    // Set canvas display size
+    canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
+    canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
+    
+    // Set canvas internal resolution
+    canvas.width = minWidth;
+    canvas.height = minHeight;
+    
+    // Update the projection matrix to match the new resolution
+    mvp.ortho2d(0, 0, canvas.width, canvas.height);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+
+    // Scale up the skeleton position to match the higher resolution
+    skeleton.x = canvas.width / 2;
+    skeleton.y = 0;
+
+    // Update framebuffer texture size
+    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    
     return {
         skeleton,
         state: animationState,
@@ -450,7 +481,8 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
             direction: "right",
         },
         position: {
-            x: 0  // Initialize at left edge
+            x: 0,
+            y: window.innerHeight - canvas.offsetHeight
         }
     };
 }
@@ -476,6 +508,56 @@ function render(): void {
     const now = Date.now() / 1000;
     const delta = now - lastFrameTime;
     lastFrameTime = now;
+
+    // Apply physics when not dragging
+    if (!isDragging) {
+        // Apply gravity
+        velocity.y += GRAVITY * delta;
+        
+        // Apply drag
+        velocity.x *= DRAG;
+        velocity.y *= DRAG;
+        if (Math.abs(velocity.x) < MIN_VELOCITY) {
+            velocity.x = 0;
+        }
+        if (Math.abs(velocity.y) < MIN_VELOCITY) {
+            velocity.y = 0;
+        }
+        
+        // Clamp velocities
+        velocity.x = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity.x));
+        velocity.y = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity.y));
+        
+        // Update position
+        character.position.x += velocity.x * delta;
+        character.position.y += velocity.y * delta;
+        
+        // Window bounds collision
+        const maxX = window.innerWidth - canvas.offsetWidth;
+        const maxY = window.innerHeight - canvas.offsetHeight;
+        
+        // Bounce off walls
+        if (character.position.x < 0) {
+            character.position.x = 0;
+            velocity.x = -velocity.x * BOUNCE_DAMPING;
+        } else if (character.position.x > maxX) {
+            character.position.x = maxX;
+            velocity.x = -velocity.x * BOUNCE_DAMPING;
+        }
+        
+        // Bounce off floor/ceiling
+        if (character.position.y < 0) {
+            character.position.y = 0;
+            velocity.y = 0;
+        } else if (character.position.y > maxY) {
+            character.position.y = maxY;
+            velocity.y = 0;
+        }
+        
+        // Update canvas position
+        canvas.style.left = character.position.x + 'px';
+        canvas.style.top = character.position.y + 'px';
+    }
 
     // First pass - render to framebuffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
@@ -583,32 +665,6 @@ function render(): void {
     requestAnimationFrame(render);
 }
 
-function resize(): void {
-    // Get the minimum required width and height based on character bounds
-    const minWidth = character.bounds.size.x * 2;
-    const minHeight = character.bounds.size.y * 1.2;
-    
-    // Set canvas display size
-    canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
-    canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
-    
-    // Set canvas internal resolution
-    canvas.width = minWidth;
-    canvas.height = minHeight;
-    
-    // Update the projection matrix to match the new resolution
-    mvp.ortho2d(0, 0, canvas.width, canvas.height);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-
-    // Scale up the skeleton position to match the higher resolution
-    character.skeleton.x = canvas.width / 2;
-    character.skeleton.y = 0;
-
-    // Update framebuffer texture size
-    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-}
-
 function randomPick(probabilities: number[]): number {
     let random = Math.random();
     let cumulativeProb = 0;
@@ -670,17 +726,37 @@ function handleDragStart(e: MouseEvent): void {
 
 function handleDrag(e: MouseEvent): void {
     if (isDragging) {
-        const newLeft = e.clientX - dragStartRelativeX;
+        const oldX = character.position.x;
+        const oldY = character.position.y;
         
-        // Constrain to window bounds
-        const maxLeft = window.innerWidth - canvas.offsetWidth;
-        character.position.x = Math.max(0, Math.min(maxLeft, newLeft));
+        // Update position
+        const newX = e.clientX - dragStartRelativeX;
+        const newY = e.clientY - canvas.offsetHeight / 2;
+        
+        // Calculate velocity based on time between events
+        if (lastDragEvent) {
+            const dt = (e.timeStamp - lastDragEvent.timeStamp) / 1000; // Convert to seconds
+            if (dt > 0) { // Prevent division by zero
+                velocity.x = (newX - oldX) / dt;
+                velocity.y = (newY - oldY) / dt;
+            }
+        }
+        
+        // Update position
+        character.position.x = newX;
+        character.position.y = newY;
+        
+        // Update canvas position
         canvas.style.left = character.position.x + 'px';
+        canvas.style.top = character.position.y + 'px';
+        
+        lastDragEvent = e;
     }
 }
 
 function handleDragEnd(): void {
     isDragging = false;
+    lastDragEvent = null;
 }
 
 window.addEventListener('load', init); 
