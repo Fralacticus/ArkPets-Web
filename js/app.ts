@@ -67,10 +67,6 @@ interface Character {
         size: spine.Vector2;
     };
     currentAction: Action;
-    position: {
-        x: number;
-        y: number; // Add y position
-    };
 }
 
 type Direction = "left" | "right";
@@ -81,6 +77,14 @@ interface Action {
 }
 
 let character: Character;
+
+let position: {
+    x: number;
+    y: number;
+} = {
+    x: 0,
+    y: 1e9
+};
 
 const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
 const ANIMATION_MARKOV = [
@@ -93,7 +97,7 @@ const ANIMATION_MARKOV = [
 
 function createContextMenu() {
     const menu = document.createElement('div');
-    menu.id = 'contextMenu';
+    menu.id = 'arkpets-menu';
     menu.style.display = 'none';
     menu.style.position = 'fixed';
     menu.style.zIndex = '1000';
@@ -105,7 +109,7 @@ function createContextMenu() {
     
     // Create Characters submenu
     const charactersMenu = document.createElement('div');
-    charactersMenu.className = 'menu-item';
+    charactersMenu.className = 'arkpets-menu-item';
     charactersMenu.innerHTML = 'Characters ►';
     charactersMenu.style.padding = '5px 20px';
     charactersMenu.style.cursor = 'pointer';
@@ -166,7 +170,7 @@ function createContextMenu() {
     
     // Create About menu item
     const aboutMenu = document.createElement('div');
-    aboutMenu.className = 'menu-item';
+    aboutMenu.className = 'arkpets-menu-item';
     aboutMenu.innerHTML = 'About';
     aboutMenu.style.padding = '5px 20px';
     aboutMenu.style.cursor = 'pointer';
@@ -180,7 +184,7 @@ function createContextMenu() {
 
     // Create Hide menu item
     const hideMenu = document.createElement('div');
-    hideMenu.className = 'menu-item';
+    hideMenu.className = 'arkpets-menu-item';
     hideMenu.innerHTML = 'Hide';
     hideMenu.onclick = () => {
         menu.style.display = 'none';
@@ -217,7 +221,7 @@ type DragEvent = MouseEvent | TouchEvent;
 
 function init(): void {
     // Setup canvas and WebGL context
-    canvas = document.getElementById("canvas") as HTMLCanvasElement;
+    canvas = document.getElementById("arkpets-canvas") as HTMLCanvasElement;
     canvas.style.pointerEvents = "none";
     
     gl = canvas.getContext("webgl", {
@@ -258,7 +262,7 @@ function init(): void {
     // Helper function to show menu
     const showContextMenu = (e: MouseEvent | TouchEvent) => {
         e.preventDefault();
-        const menu = document.getElementById('contextMenu');
+        const menu = document.getElementById('arkpets-menu');
         if (menu) {
             // Temporarily make menu visible but transparent to measure dimensions
             menu.style.opacity = '0';
@@ -298,7 +302,7 @@ function init(): void {
     
     // Hide menu when clicking/touching outside
     document.addEventListener('click', (e) => {
-        const menu = document.getElementById('contextMenu');
+        const menu = document.getElementById('arkpets-menu');
         if (menu) {
             menu.style.display = 'none';
         }
@@ -306,7 +310,7 @@ function init(): void {
 
     document.addEventListener('touchstart', (e) => {
         if (!isLongPress) {
-            const menu = document.getElementById('contextMenu');
+            const menu = document.getElementById('arkpets-menu');
             if (menu) {
                 menu.style.display = 'none';
             }
@@ -479,7 +483,7 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
     // Update framebuffer texture size
     gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    
+
     return {
         skeleton,
         state: animationState,
@@ -487,10 +491,6 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
         currentAction: {
             animation: "Relax",
             direction: "right",
-        },
-        position: {
-            x: 0,
-            y: window.innerHeight - canvas.offsetHeight
         }
     };
 }
@@ -537,34 +537,34 @@ function render(): void {
         velocity.y = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity.y));
         
         // Update position
-        character.position.x += velocity.x * delta;
-        character.position.y += velocity.y * delta;
+        position.x += velocity.x * delta;
+        position.y += velocity.y * delta;
         
         // Window bounds collision
         const maxX = window.innerWidth - canvas.offsetWidth;
         const maxY = window.innerHeight - canvas.offsetHeight;
         
         // Bounce off walls
-        if (character.position.x < 0) {
-            character.position.x = 0;
+        if (position.x < 0) {
+            position.x = 0;
             velocity.x = -velocity.x * BOUNCE_DAMPING;
-        } else if (character.position.x > maxX) {
-            character.position.x = maxX;
+        } else if (position.x > maxX) {
+            position.x = maxX;
             velocity.x = -velocity.x * BOUNCE_DAMPING;
         }
         
         // Bounce off floor/ceiling
-        if (character.position.y < 0) {
-            character.position.y = 0;
+        if (position.y < 0) {
+            position.y = 0;
             velocity.y = 0;
-        } else if (character.position.y > maxY) {
-            character.position.y = maxY;
+        } else if (position.y > maxY) {
+            position.y = maxY;
             velocity.y = 0;
         }
         
         // Update canvas position
-        canvas.style.left = character.position.x + 'px';
-        canvas.style.top = character.position.y + 'px';
+        canvas.style.left = position.x + 'px';
+        canvas.style.top = position.y + 'px';
     }
 
     // First pass - render to framebuffer
@@ -583,19 +583,19 @@ function render(): void {
         const moveSpeed = 30; // pixels per second
         const movement = moveSpeed * delta;
         if (character.currentAction.direction === "left") {
-            character.position.x = Math.max(0, character.position.x - movement);
-            canvas.style.left = character.position.x + "px";
+            position.x = Math.max(0, position.x - movement);
+            canvas.style.left = position.x + "px";
             // Turn around when reaching left edge
-            if (character.position.x <= 0) {
-                character.position.x = 0;
+            if (position.x <= 0) {
+                position.x = 0;
                 character.currentAction.direction = "right";
             }
         } else {
-            character.position.x = character.position.x + movement;
-            canvas.style.left = character.position.x + "px";
+            position.x = position.x + movement;
+            canvas.style.left = position.x + "px";
             // Turn around when reaching right edge
-            if (character.position.x >= window.innerWidth - canvas.width) {
-                character.position.x = window.innerWidth - canvas.width;
+            if (position.x >= window.innerWidth - canvas.width) {
+                position.x = window.innerWidth - canvas.width;
                 character.currentAction.direction = "left";
             }
         }
@@ -724,8 +724,8 @@ function handleDragStart(e: DragEvent): void {
         // Get coordinates regardless of event type
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-        dragStartRelativeX = clientX - character.position.x;
-        dragStartRelativeY = clientY - character.position.y;
+        dragStartRelativeX = clientX - position.x;
+        dragStartRelativeY = clientY - position.y;
         
         // Pause any current animation
         if (character && character.state) {
@@ -744,8 +744,8 @@ function handleDrag(e: DragEvent): void {
         const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
         const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
         
-        const oldX = character.position.x;
-        const oldY = character.position.y;
+        const oldX = position.x;
+        const oldY = position.y;
         
         // Update position
         const newX = clientX - dragStartRelativeX;
@@ -761,12 +761,12 @@ function handleDrag(e: DragEvent): void {
         }
         
         // Update position
-        character.position.x = newX;
-        character.position.y = newY;
+        position.x = newX;
+        position.y = newY;
         
         // Update canvas position
-        canvas.style.left = character.position.x + 'px';
-        canvas.style.top = character.position.y + 'px';
+        canvas.style.left = position.x + 'px';
+        canvas.style.top = position.y + 'px';
         
         lastDragEvent = e as MouseEvent;
         
