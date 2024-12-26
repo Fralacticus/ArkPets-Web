@@ -238,7 +238,11 @@ function init(): void {
     const contextMenu = createContextMenu();
     
     // Add context menu event listeners
-    canvas.addEventListener('contextmenu', (e) => {
+    let longPressTimer: number;
+    let isLongPress = false;
+
+    // Helper function to show menu
+    const showContextMenu = (e: MouseEvent | TouchEvent) => {
         e.preventDefault();
         const menu = document.getElementById('contextMenu');
         if (menu) {
@@ -247,18 +251,53 @@ function init(): void {
             menu.style.display = 'block';
             const { innerWidth, innerHeight } = window;
             const { offsetWidth, offsetHeight } = menu;
-            menu.style.left = Math.min(e.pageX, innerWidth - offsetWidth) + 'px';
-            menu.style.top = Math.min(e.pageY, innerHeight - offsetHeight) + 'px';
+            
+            // Get coordinates based on event type
+            const pageX = 'touches' in e ? e.touches[0].pageX : (e as MouseEvent).pageX;
+            const pageY = 'touches' in e ? e.touches[0].pageY : (e as MouseEvent).pageY;
+            
+            menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
+            menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
             menu.style.opacity = '1';
         }
+    };
+
+    // Handle desktop right click
+    canvas.addEventListener('contextmenu', showContextMenu);
+
+    // Handle mobile long press
+    canvas.addEventListener('touchstart', (e) => {
+        isLongPress = false;
+        longPressTimer = window.setTimeout(() => {
+            isLongPress = true;
+            showContextMenu(e);
+        }, 500); // 500ms for long press
+    });
+
+    canvas.addEventListener('touchend', () => {
+        clearTimeout(longPressTimer);
+    });
+
+    canvas.addEventListener('touchmove', () => {
+        clearTimeout(longPressTimer);
     });
     
-    // Hide menu when clicking outside
+    // Hide menu when clicking/touching outside
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('contextMenu');
         if (menu) {
             menu.style.display = 'none';
         }
+    });
+
+    document.addEventListener('touchstart', (e) => {
+        if (!isLongPress) {
+            const menu = document.getElementById('contextMenu');
+            if (menu) {
+                menu.style.display = 'none';
+            }
+        }
+        isLongPress = false;
     });
 
     document.addEventListener('mousemove', handleMouseMove);

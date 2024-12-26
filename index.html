@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spine Animation</title>
     <style>
         * { margin: 0; padding: 0; }
@@ -14,16 +15,17 @@
         }
         h1 {
             text-align: center;
-            padding: 2rem 0;
+            padding: 1.5rem 0;
             color: #2c3e50;
-            font-size: 2.5rem;
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
         }
         p {
-            margin: 1rem 2rem;
+            margin: 1rem;
             text-align: justify;
             max-width: 800px;
             margin-left: auto;
             margin-right: auto;
+            padding: 0 15px;
         }
         canvas {
             position: fixed;
