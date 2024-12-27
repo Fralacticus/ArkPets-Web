@@ -69,6 +69,7 @@ type Direction = "left" | "right";
 interface Action {
     animation: string;
     direction: Direction;
+    timestamp: number;
 }
 
 let character: Character;
@@ -89,6 +90,30 @@ const ANIMATION_MARKOV = [
     [0.5, 0.0, 0.0, 0.5, 0.0],
     [0.3, 0.0, 0.0, 0.0, 0.7],
 ]
+
+function saveToSessionStorage(): void {
+    sessionStorage.setItem('characterState', JSON.stringify({
+        position,
+        currentAction: character?.currentAction,
+        characterResource: characterResource
+    }));
+}
+
+function loadFromSessionStorage(): void {
+    const saved = sessionStorage.getItem('characterState');
+    if (saved) {
+        const state = JSON.parse(saved);
+        position = state.position;
+        if (state.currentAction && character) {
+            character.currentAction = state.currentAction;
+            character.state.setAnimation(0, state.currentAction.animation, true);
+            character.state.update(state.currentAction.timestamp);
+        }
+        if (state.characterResource.name !== characterResource.name) {
+            setCharacterResource(state.characterResource);
+        }
+    }
+}
 
 function setCharacterResource(char: CharacterResource) {
     characterResource = char;
@@ -243,6 +268,9 @@ function load(): void {
         character = loadCharacter(characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
         lastFrameTime = Date.now() / 1000;
         
+        // TODO: better to load from session storage before loadCharacter
+        loadFromSessionStorage();
+        
         requestAnimationFrame(render);
     } else {
         console.log("Loading assets of character", characterResource.name, "progress", assetManager.getLoaded(), "/", assetManager.getToLoad());
@@ -315,6 +343,7 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
         currentAction: {
             animation: "Relax",
             direction: "right",
+            timestamp: 0
         }
     };
 }
@@ -340,6 +369,7 @@ function render(): void {
     const now = Date.now() / 1000;
     const delta = now - lastFrameTime;
     lastFrameTime = now;
+    character.currentAction.timestamp += delta;
 
     // Apply physics when not dragging
     if (!isDragging) {
@@ -487,6 +517,8 @@ function render(): void {
     gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+    saveToSessionStorage();
+
     requestAnimationFrame(render);
 }
 
@@ -518,7 +550,8 @@ function nextAction(current: Action): Action {
     }
     return {
         animation: nextAnim,
-        direction: nextDirection
+        direction: nextDirection,
+        timestamp: 0
     };
 }
 
@@ -526,7 +559,8 @@ function handleCanvasClick(): void {
     if (character && character.state) {
         character.currentAction = {
             animation: "Interact",
-            direction: character.currentAction.direction
+            direction: character.currentAction.direction,
+            timestamp: 0,
         };
         character.state.setAnimation(0, "Interact", false);
         console.log("Play action", character.currentAction);
@@ -548,7 +582,8 @@ function handleDragStart(e: DragEvent): void {
             character.state.setAnimation(0, "Relax", true);
             character.currentAction = {
                 animation: "Relax",
-                direction: character.currentAction.direction
+                direction: character.currentAction.direction,
+                timestamp: 0
             };
         }
     }
