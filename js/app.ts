@@ -5,34 +5,11 @@ import outlineVertexShader from '../shaders/OutlineVertex.glsl';
 import { createContextMenu, hideContextMenu, showContextMenu } from './menu';
 import { CharacterResource } from './types';
 
-// Rendering
-let canvas: HTMLCanvasElement;
-let gl: WebGLRenderingContext;
-let shader: webgl.Shader;
-let batcher: webgl.PolygonBatcher;
-let mvp = new webgl.Matrix4();
-let assetManager: webgl.AssetManager;
-let skeletonRenderer: webgl.SkeletonRenderer;
-let lastFrameTime: number; // TODO: reuse currentAction.timestamp
-let framebuffer: WebGLFramebuffer;
-let framebufferTexture: WebGLTexture;
-let outlineShader: WebGLProgram;
-let quadBuffer: WebGLBuffer;
-
 // Supersampling is necessary for high-res display
 const SUPERSAMPLE_FACTOR = 2;
 
-// Dragging
-let isMouseOver = false;
-let isDragging = false;
-let dragStartRelativeX = 0;
-let dragStartRelativeY = 0;
-let lastDragEvent: MouseEvent | null = null;
-
 const MOVING_SPEED = 30; // pixels per second
 
-// Physicsal motion
-let velocity = { x: 0, y: 0 };
 const GRAVITY = 1000; // pixels per second squared
 const DRAG = 0.98; // air resistance
 const MAX_VELOCITY = 1000; // maximum velocity in pixels per second
@@ -40,6 +17,7 @@ const MIN_VELOCITY = 5; // threshold for stopping
 const BOUNCE_DAMPING = 0.7; // energy loss on bounce
 
 const RESOURCE_PATH = "/assets/models/";
+
 
 const CHARACTER_RESOURCES: CharacterResource[] = [
     {
@@ -56,14 +34,49 @@ const CHARACTER_RESOURCES: CharacterResource[] = [
     },
 ];
 
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
+const ANIMATION_MARKOV = [
+    [0.5, 0.0, 0.25, 0.15, 0.1],
+    [1.0, 0.0, 0.0, 0.0, 0.0],
+    [0.3, 0.0, 0.7, 0.0, 0.0],
+    [0.5, 0.0, 0.0, 0.5, 0.0],
+    [0.3, 0.0, 0.0, 0.0, 0.7],
+]
+
+// Rendering
+let canvas: HTMLCanvasElement;
+let gl: WebGLRenderingContext;
+let shader: webgl.Shader;
+let batcher: webgl.PolygonBatcher;
+let mvp = new webgl.Matrix4();
+let assetManager: webgl.AssetManager;
+let skeletonRenderer: webgl.SkeletonRenderer;
+let lastFrameTime: number; // TODO: reuse currentAction.timestamp
+let framebuffer: WebGLFramebuffer;
+let framebufferTexture: WebGLTexture;
+let outlineShader: WebGLProgram;
+let quadBuffer: WebGLBuffer;
+
+let isMouseOver = false;
+
+// Dragging
+let isDragging = false;
+let dragStartRelativeX = 0;
+let dragStartRelativeY = 0;
+let lastDragEvent: MouseEvent | null = null;
+
+// Physicsal motion
+let velocity = { x: 0, y: 0 };
+
+
 let characterResource: CharacterResource = CHARACTER_RESOURCES[0];
 
-interface Character {
+interface SpineCharacter {
     skeleton: spine.Skeleton;
     state: spine.AnimationState;
 }
 
-let character: Character;
+let character: SpineCharacter;
 
 type Direction = "left" | "right";
 
@@ -85,15 +98,6 @@ let position: {
     x: 0,
     y: 1e9
 };
-
-const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
-const ANIMATION_MARKOV = [
-    [0.5, 0.0, 0.25, 0.15, 0.1],
-    [1.0, 0.0, 0.0, 0.0, 0.0],
-    [0.3, 0.0, 0.7, 0.0, 0.0],
-    [0.5, 0.0, 0.0, 0.5, 0.0],
-    [0.3, 0.0, 0.0, 0.0, 0.7],
-]
 
 function saveToSessionStorage(): void {
     sessionStorage.setItem('characterState', JSON.stringify({
@@ -282,7 +286,7 @@ function load(): void {
     }
 }
 
-function loadCharacter(resource: CharacterResource, scale: number = 1.0): Character {    
+function loadCharacter(resource: CharacterResource, scale: number = 1.0): SpineCharacter {    
     const atlas = assetManager.get(resource.atlas);
     const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
     const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
