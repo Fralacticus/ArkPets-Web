@@ -1,5 +1,8 @@
 import { CharacterResource } from './types';
 
+// Singleton
+let menu: HTMLElement;
+
 interface MenuItemStyle {
     padding: string;
     cursor: string;
@@ -10,7 +13,8 @@ export function createContextMenu(
     onCharacterSelect: (char: CharacterResource) => void,
     onHideCharacter: () => void
 ): HTMLElement {
-    const menu = document.createElement('div');
+    menu = document.createElement('div');
+    
     menu.id = 'arkpets-menu';
     menu.style.display = 'none';
     menu.style.position = 'fixed';
@@ -113,27 +117,22 @@ export function createContextMenu(
 
 export function showContextMenu(e: MouseEvent | TouchEvent): void {
     e.preventDefault();
-    const menu = document.getElementById('arkpets-menu');
-    if (menu) {
-        // Temporarily make menu visible but transparent to measure dimensions
-        menu.style.opacity = '0';
-        menu.style.display = 'block';
-        const { innerWidth, innerHeight } = window;
-        const { offsetWidth, offsetHeight } = menu;
-        
-        // Get coordinates based on event type
-        const pageX = 'touches' in e ? e.touches[0].pageX : (e as MouseEvent).pageX;
-        const pageY = 'touches' in e ? e.touches[0].pageY : (e as MouseEvent).pageY;
-        
-        menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
-        menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
-        menu.style.opacity = '1';
-    }
+
+    // Temporarily make menu visible but transparent to measure dimensions
+    menu.style.opacity = '0';
+    menu.style.display = 'block';
+    const { innerWidth, innerHeight } = window;
+    const { offsetWidth, offsetHeight } = menu;
+    
+    // Get coordinates based on event type
+    const pageX = 'touches' in e ? e.touches[0].pageX : (e as MouseEvent).pageX;
+    const pageY = 'touches' in e ? e.touches[0].pageY : (e as MouseEvent).pageY;
+    
+    menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
+    menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
+    menu.style.opacity = '1';
 }
 
 export function hideContextMenu(): void {
-    const menu = document.getElementById('arkpets-menu');
-    if (menu) {
-        menu.style.display = 'none';
-    }
+    menu.style.display = 'none';
 }
