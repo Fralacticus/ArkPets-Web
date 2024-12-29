@@ -13,7 +13,7 @@ let batcher: webgl.PolygonBatcher;
 let mvp = new webgl.Matrix4();
 let assetManager: webgl.AssetManager;
 let skeletonRenderer: webgl.SkeletonRenderer;
-let lastFrameTime: number;
+let lastFrameTime: number; // TODO: reuse currentAction.timestamp
 let framebuffer: WebGLFramebuffer;
 let framebufferTexture: WebGLTexture;
 let outlineShader: WebGLProgram;
@@ -61,8 +61,9 @@ let characterResource: CharacterResource = CHARACTER_RESOURCES[0];
 interface Character {
     skeleton: spine.Skeleton;
     state: spine.AnimationState;
-    currentAction: Action;
 }
+
+let character: Character;
 
 type Direction = "left" | "right";
 
@@ -71,8 +72,11 @@ interface Action {
     direction: Direction;
     timestamp: number;
 }
-
-let character: Character;
+let currentAction: Action = {
+    animation: "Relax",
+    direction: "right",
+    timestamp: 0
+};
 
 let position: {
     x: number;
@@ -94,8 +98,8 @@ const ANIMATION_MARKOV = [
 function saveToSessionStorage(): void {
     sessionStorage.setItem('characterState', JSON.stringify({
         position,
-        currentAction: character?.currentAction,
-        characterResource: characterResource
+        currentAction,
+        characterResource
     }));
 }
 
@@ -104,22 +108,16 @@ function loadFromSessionStorage(): void {
     if (saved) {
         const state = JSON.parse(saved);
         position = state.position;
-        if (state.currentAction && character) {
-            character.currentAction = state.currentAction;
-            character.state.setAnimation(0, state.currentAction.animation, true);
-            character.state.update(state.currentAction.timestamp);
-        }
-        if (state.characterResource.name !== characterResource.name) {
-            setCharacterResource(state.characterResource);
-        }
+        currentAction = state.currentAction;
+        characterResource = state.characterResource;
     }
 }
 
-function setCharacterResource(char: CharacterResource) {
-    characterResource = char;
+function loadCharacterAssets(char: CharacterResource) {
     assetManager.removeAll();
     assetManager.loadBinary(char.skeleton);
     assetManager.loadTextureAtlas(char.atlas);
+
     requestAnimationFrame(load);
 }
 
@@ -169,15 +167,21 @@ function init(): void {
     skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(gl));
     assetManager = new webgl.AssetManager(gl, RESOURCE_PATH);
 
+    // Load animation state from session storage
+    loadFromSessionStorage();
+
     // Load assets for initial character
-    setCharacterResource(CHARACTER_RESOURCES[0]);
+    loadCharacterAssets(characterResource);
 
     // Add click event listener to canvas
     canvas.addEventListener('click', handleCanvasClick);
 
     const contextMenu = createContextMenu(
         CHARACTER_RESOURCES,
-        setCharacterResource,
+        (char) => {
+            characterResource = char;
+            loadCharacterAssets(char);
+        },
         hideCharacter
     );
 
@@ -266,11 +270,11 @@ function initFramebuffer(): void {
 function load(): void {
     if (assetManager.isLoadingComplete()) {
         character = loadCharacter(characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
+        character.state.setAnimation(0, currentAction.animation, true);
+        character.state.update(currentAction.timestamp);
+
         lastFrameTime = Date.now() / 1000;
-        
-        // TODO: better to load from session storage before loadCharacter
-        loadFromSessionStorage();
-        
+
         requestAnimationFrame(render);
     } else {
         console.log("Loading assets of character", characterResource.name, "progress", assetManager.getLoaded(), "/", assetManager.getToLoad());
@@ -305,8 +309,8 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
     // Listen for animation completion
     class AnimationStateAdapter extends spine.AnimationStateAdapter {
         complete(entry: spine.TrackEntry): void {
-            const action = nextAction(character.currentAction);
-            character.currentAction = action;
+            const action = nextAction(currentAction);
+            currentAction = action;
             console.log("Play action", action)
             animationState.setAnimation(0, action.animation, true);
         }
@@ -340,11 +344,6 @@ function loadCharacter(resource: CharacterResource, scale: number = 1.0): Charac
     return {
         skeleton,
         state: animationState,
-        currentAction: {
-            animation: "Relax",
-            direction: "right",
-            timestamp: 0
-        }
     };
 }
 
@@ -369,7 +368,7 @@ function render(): void {
     const now = Date.now() / 1000;
     const delta = now - lastFrameTime;
     lastFrameTime = now;
-    character.currentAction.timestamp += delta;
+    currentAction.timestamp += delta;
 
     // Apply physics when not dragging
     if (!isDragging) {
@@ -418,21 +417,21 @@ function render(): void {
     }
 
     // Move the canvas when "Move" animation is playing
-    if (character.currentAction.animation === "Move") {
+    if (currentAction.animation === "Move") {
         const movement = MOVING_SPEED * delta;
-        if (character.currentAction.direction === "left") {
+        if (currentAction.direction === "left") {
             position.x = Math.max(0, position.x - movement);
             // Turn around when reaching left edge
             if (position.x <= 0) {
                 position.x = 0;
-                character.currentAction.direction = "right";
+                currentAction.direction = "right";
             }
         } else {
             position.x = position.x + movement;
             // Turn around when reaching right edge
             if (position.x >= window.innerWidth - canvas.width) {
                 position.x = window.innerWidth - canvas.width;
-                character.currentAction.direction = "left";
+                currentAction.direction = "left";
             }
         }
     }
@@ -447,7 +446,7 @@ function render(): void {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     
-    character.skeleton.scaleX = character.currentAction.direction === "left" ? -1 : 1;
+    character.skeleton.scaleX = currentAction.direction === "left" ? -1 : 1;
 
     character.state.update(delta);
     character.state.apply(character.skeleton);
@@ -557,13 +556,13 @@ function nextAction(current: Action): Action {
 
 function handleCanvasClick(): void {
     if (character && character.state) {
-        character.currentAction = {
+        currentAction = {
             animation: "Interact",
-            direction: character.currentAction.direction,
+            direction: currentAction.direction,
             timestamp: 0,
         };
         character.state.setAnimation(0, "Interact", false);
-        console.log("Play action", character.currentAction);
+        console.log("Play action", currentAction);
     }
 }
 
@@ -580,9 +579,9 @@ function handleDragStart(e: DragEvent): void {
         // Pause any current animation
         if (character && character.state) {
             character.state.setAnimation(0, "Relax", true);
-            character.currentAction = {
+            currentAction = {
                 animation: "Relax",
-                direction: character.currentAction.direction,
+                direction: currentAction.direction,
                 timestamp: 0
             };
         }
