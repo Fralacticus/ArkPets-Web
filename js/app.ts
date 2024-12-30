@@ -43,592 +43,585 @@ const ANIMATION_MARKOV = [
     [0.3, 0.0, 0.0, 0.0, 0.7],
 ]
 
-// Rendering
-let canvas: HTMLCanvasElement;
-let gl: WebGLRenderingContext;
-let shader: webgl.Shader;
-let batcher: webgl.PolygonBatcher;
-let mvp = new webgl.Matrix4();
-let assetManager: webgl.AssetManager;
-let skeletonRenderer: webgl.SkeletonRenderer;
-let lastFrameTime: number; // TODO: reuse currentAction.timestamp
-let framebuffer: WebGLFramebuffer;
-let framebufferTexture: WebGLTexture;
-let outlineShader: WebGLProgram;
-let quadBuffer: WebGLBuffer;
-
-let isMouseOver = false;
-
-// Dragging
-let isDragging = false;
-let dragStartRelativeX = 0;
-let dragStartRelativeY = 0;
-let lastDragEvent: MouseEvent | null = null;
-
-// Physicsal motion
-let velocity = { x: 0, y: 0 };
-
-
-let characterResource: CharacterResource = CHARACTER_RESOURCES[0];
-
 interface SpineCharacter {
     skeleton: spine.Skeleton;
     state: spine.AnimationState;
 }
-
-let character: SpineCharacter;
-
-type Direction = "left" | "right";
 
 interface Action {
     animation: string;
     direction: Direction;
     timestamp: number;
 }
-let currentAction: Action = {
-    animation: "Relax",
-    direction: "right",
-    timestamp: 0
-};
 
-let position: {
-    x: number;
-    y: number;
-} = {
-    x: 0,
-    y: 1e9
-};
+type Direction = "left" | "right";
 
-function saveToSessionStorage(): void {
-    sessionStorage.setItem('characterState', JSON.stringify({
-        position,
-        currentAction,
-        characterResource
-    }));
-}
+class Character {
+    private canvas!: HTMLCanvasElement;
+    private gl!: WebGLRenderingContext;
+    private shader!: webgl.Shader;
+    private batcher!: webgl.PolygonBatcher;
+    private mvp!: webgl.Matrix4;
+    private assetManager!: webgl.AssetManager;
+    private skeletonRenderer!: webgl.SkeletonRenderer;
+    private lastFrameTime!: number;
+    private framebuffer!: WebGLFramebuffer;
+    private framebufferTexture!: WebGLTexture;
+    private outlineShader!: WebGLProgram;
+    private quadBuffer!: WebGLBuffer;
 
-function loadFromSessionStorage(): void {
-    const saved = sessionStorage.getItem('characterState');
-    if (saved) {
-        const state = JSON.parse(saved);
-        position = state.position;
-        currentAction = state.currentAction;
-        characterResource = state.characterResource;
-    }
-}
-
-function loadCharacterAssets(char: CharacterResource) {
-    assetManager.removeAll();
-    assetManager.loadBinary(char.skeleton);
-    assetManager.loadTextureAtlas(char.atlas);
-
-    requestAnimationFrame(load);
-}
-
-function hideCharacter(): void {
-    if (canvas) {
-        // Fade out animation
-        let opacity = 1;
-        const fadeInterval = setInterval(() => {
-            opacity -= 0.1;
-            canvas.style.opacity = opacity.toString();
-            
-            if (opacity <= 0) {
-                clearInterval(fadeInterval);
-                canvas.style.display = 'none';
-            }
-        }, 30);
-    }
-}
-
-type DragEvent = MouseEvent | TouchEvent;
-
-function init(): void {
-    // Setup canvas and WebGL context
-    canvas = document.getElementById("arkpets-canvas") as HTMLCanvasElement;
-    canvas.style.pointerEvents = "none";
+    private isMouseOver: boolean = false;
     
-    gl = canvas.getContext("webgl", {
-        alpha: true,
-        premultipliedAlpha: false
-    }) as WebGLRenderingContext;
-
-    if (!gl) {
-        alert('WebGL is unavailable.');
-        return;
-    }
-
-    // Set up blending for non-premultiplied alpha
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    // Dragging state
+    private isDragging: boolean = false;
+    private dragStartRelativeX: number = 0;
+    private dragStartRelativeY: number = 0;
+    private lastDragEvent: MouseEvent | null = null;
     
-    // Initialize framebuffer for 2-pass rendering
-    initFramebuffer();
-
-    // Create WebGL objects
-    shader = webgl.Shader.newTwoColoredTextured(gl);
-    batcher = new webgl.PolygonBatcher(gl);
-    skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(gl));
-    assetManager = new webgl.AssetManager(gl, RESOURCE_PATH);
-
-    // Load animation state from session storage
-    loadFromSessionStorage();
-
-    // Load assets for initial character
-    loadCharacterAssets(characterResource);
-
-    // Add click event listener to canvas
-    canvas.addEventListener('click', handleCanvasClick);
-
-    const contextMenu = createContextMenu(
-        CHARACTER_RESOURCES,
-        (char) => {
-            characterResource = char;
-            loadCharacterAssets(char);
-        },
-        hideCharacter
-    );
-
-    // Handle desktop right click
-    canvas.addEventListener('contextmenu', showContextMenu);
+    // Physics state
+    private velocity = { x: 0, y: 0 };
     
-    // Hide menu when clicking outside
-    document.addEventListener('click', hideContextMenu);
-
-    // Mouse events for detecting mouse-over effect
-    document.addEventListener('mousemove', handleMouseMove);
-
-    // Mouse events for dragging
-    canvas.addEventListener('mousedown', handleDragStart);
-    document.addEventListener('mousemove', handleDrag);
-    document.addEventListener('mouseup', handleDragEnd);
-
-    // Touch events for dragging
-    canvas.addEventListener('touchstart', handleDragStart);
-    document.addEventListener('touchmove', handleDrag);
-    document.addEventListener('touchend', handleDragEnd);
-
-    window.addEventListener('resize', (e) => {
-        if (canvas) {
-            // Constrain to window bounds
-            const maxLeft = window.innerWidth - canvas.offsetWidth;
-            position.x = Math.max(0, Math.min(maxLeft, position.x));
-        }
-    });
-}
-
-function initFramebuffer(): void {
-    // Create and bind framebuffer
-    framebuffer = gl.createFramebuffer()!;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-
-    // Create and bind texture
-    framebufferTexture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    // Attach texture to framebuffer
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, framebufferTexture, 0);
-
-    // Create quad buffer for second pass
-    quadBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        -1, -1,  // Bottom left
-         1, -1,  // Bottom right
-        -1,  1,  // Top left
-         1,  1   // Top right
-    ]), gl.STATIC_DRAW);
-
-    // Create and compile outline shader
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vertexShader, outlineVertexShader);
-    gl.compileShader(vertexShader);
-
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)!;
-    gl.shaderSource(fragmentShader, outlineFragmentShader);
-    gl.compileShader(fragmentShader);
-
-    // Compile shaders
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-        console.error('Vertex shader compilation failed:', gl.getShaderInfoLog(vertexShader));
-    }
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-        console.error('Fragment shader compilation failed:', gl.getShaderInfoLog(fragmentShader));
-    }
-    outlineShader = gl.createProgram()!;
-    gl.attachShader(outlineShader, vertexShader);
-    gl.attachShader(outlineShader, fragmentShader);
-    gl.linkProgram(outlineShader);
-    if (!gl.getProgramParameter(outlineShader, gl.LINK_STATUS)) {
-        console.error('Program linking failed:', gl.getProgramInfoLog(outlineShader));
-    }
-}
-
-function load(): void {
-    if (assetManager.isLoadingComplete()) {
-        character = loadCharacter(characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
-        character.state.setAnimation(0, currentAction.animation, true);
-        character.state.update(currentAction.timestamp);
-
-        lastFrameTime = Date.now() / 1000;
-
-        requestAnimationFrame(render);
-    } else {
-        console.log("Loading assets of character", characterResource.name, "progress", assetManager.getLoaded(), "/", assetManager.getToLoad());
-        requestAnimationFrame(load);
-    }
-}
-
-function loadCharacter(resource: CharacterResource, scale: number = 1.0): SpineCharacter {    
-    const atlas = assetManager.get(resource.atlas);
-    const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
-    const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
-
-    skeletonBinary.scale = scale;
-    const skeletonData = skeletonBinary.readSkeletonData(assetManager.get(resource.skeleton));
-    const skeleton = new spine.Skeleton(skeletonData);
-    const bounds = calculateSetupPoseBounds(skeleton);
-
-    const animationStateData = new spine.AnimationStateData(skeleton.data);
-
-    // Animation transitions
-    ANIMATION_NAMES.forEach(fromAnim => {
-        ANIMATION_NAMES.forEach(toAnim => {
-            if (fromAnim !== toAnim) {
-                animationStateData.setMix(fromAnim, toAnim, 0.3);
-            }
-        });
-    });
-
-    const animationState = new spine.AnimationState(animationStateData);
-    animationState.setAnimation(0, "Relax", true);
-
-    // Listen for animation completion
-    class AnimationStateAdapter extends spine.AnimationStateAdapter {
-        complete(entry: spine.TrackEntry): void {
-            const action = nextAction(currentAction);
-            currentAction = action;
-            console.log("Play action", action)
-            animationState.setAnimation(0, action.animation, true);
-        }
-    }
-    animationState.addListener(new AnimationStateAdapter());
-
-    // Get the minimum required width and height based on character bounds
-    const minWidth = bounds.size.x * 2;
-    const minHeight = bounds.size.y * 1.2;
+    private characterResource: CharacterResource;
+    private character!: SpineCharacter;
     
-    // Set canvas display size
-    canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
-    canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
-    
-    // Set canvas internal resolution
-    canvas.width = minWidth;
-    canvas.height = minHeight;
-    
-    // Update the projection matrix to match the new resolution
-    mvp.ortho2d(0, 0, canvas.width, canvas.height);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-
-    // Scale up the skeleton position to match the higher resolution
-    skeleton.x = canvas.width / 2;
-    skeleton.y = 0;
-
-    // Update framebuffer texture size
-    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-
-    return {
-        skeleton,
-        state: animationState,
-    };
-}
-
-function calculateSetupPoseBounds(skeleton: spine.Skeleton) {
-    skeleton.setToSetupPose();
-    skeleton.updateWorldTransform();
-    const offset = new spine.Vector2();
-    const size = new spine.Vector2();
-    skeleton.getBounds(offset, size, []);
-    return { offset, size };
-}
-
-// Mouse position (client, no transform, no supersampling)
-let currentMousePos = { x: 0, y: 0 };
-
-function handleMouseMove(event: MouseEvent): void {
-    currentMousePos.x = event.clientX;
-    currentMousePos.y = event.clientY;
-}
-
-function render(): void {
-    const now = Date.now() / 1000;
-    const delta = now - lastFrameTime;
-    lastFrameTime = now;
-    currentAction.timestamp += delta;
-
-    // Apply physics when not dragging
-    if (!isDragging) {
-        // Apply gravity
-        velocity.y += GRAVITY * delta;
-        
-        // Apply drag
-        velocity.x *= DRAG;
-        velocity.y *= DRAG;
-        if (Math.abs(velocity.x) < MIN_VELOCITY) {
-            velocity.x = 0;
-        }
-        if (Math.abs(velocity.y) < MIN_VELOCITY) {
-            velocity.y = 0;
-        }
-        
-        // Clamp velocities
-        velocity.x = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity.x));
-        velocity.y = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, velocity.y));
-        
-        // Update position
-        position.x += velocity.x * delta;
-        position.y += velocity.y * delta;
-        
-        // Window bounds collision
-        const maxX = window.innerWidth - canvas.offsetWidth;
-        const maxY = window.innerHeight - canvas.offsetHeight;
-        
-        // Bounce off walls
-        if (position.x < 0) {
-            position.x = 0;
-            velocity.x = -velocity.x * BOUNCE_DAMPING;
-        } else if (position.x > maxX) {
-            position.x = maxX;
-            velocity.x = -velocity.x * BOUNCE_DAMPING;
-        }
-        
-        // Bounce off floor/ceiling
-        if (position.y < 0) {
-            position.y = 0;
-            velocity.y = 0;
-        } else if (position.y > maxY) {
-            position.y = maxY;
-            velocity.y = 0;
-        }
-    }
-
-    // Move the canvas when "Move" animation is playing
-    if (currentAction.animation === "Move") {
-        const movement = MOVING_SPEED * delta;
-        if (currentAction.direction === "left") {
-            position.x = Math.max(0, position.x - movement);
-            // Turn around when reaching left edge
-            if (position.x <= 0) {
-                position.x = 0;
-                currentAction.direction = "right";
-            }
-        } else {
-            position.x = position.x + movement;
-            // Turn around when reaching right edge
-            if (position.x >= window.innerWidth - canvas.width) {
-                position.x = window.innerWidth - canvas.width;
-                currentAction.direction = "left";
-            }
-        }
-    }
-
-    // Update canvas position to `position`
-    canvas.style.left = position.x + "px";
-    canvas.style.top = position.y + "px";
-
-    // 1st pass - render Spine character to framebuffer
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    
-    character.skeleton.scaleX = currentAction.direction === "left" ? -1 : 1;
-
-    character.state.update(delta);
-    character.state.apply(character.skeleton);
-    character.skeleton.updateWorldTransform();
-
-    shader.bind();
-    shader.setUniformi(webgl.Shader.SAMPLER, 0);
-    shader.setUniform4x4f(webgl.Shader.MVP_MATRIX, mvp.values);
-
-    batcher.begin(shader);
-    skeletonRenderer.premultipliedAlpha = false;
-    skeletonRenderer.draw(batcher, character.skeleton);
-    batcher.end();
-
-    shader.unbind();
-
-    // Read pixels before 2nd pass to determine if mouse is over character
-    const canvasRect = canvas.getBoundingClientRect();
-    let pixelX = (currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
-    let pixelY = canvas.height - (currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
-    let pixelColor = new Uint8Array(4);
-    gl.readPixels(
-        pixelX, 
-        pixelY, 
-        1, 1, 
-        gl.RGBA, 
-        gl.UNSIGNED_BYTE, 
-        pixelColor
-    );
-    isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0;
-    if (isMouseOver) {
-        canvas.style.pointerEvents = 'auto';
-    } else {
-        // Disable any mouse interaction so that the webpage content can be selected
-        canvas.style.pointerEvents = 'none';
-    }
-
-    // 2nd pass - render to screen with outline effect
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    gl.useProgram(outlineShader);
-
-    // Set uniforms
-    const uTexture = gl.getUniformLocation(outlineShader, "u_texture");
-    const uOutlineColor = gl.getUniformLocation(outlineShader, "u_outlineColor");
-    const uOutlineWidth = gl.getUniformLocation(outlineShader, "u_outlineWidth");
-    const uTextureSize = gl.getUniformLocation(outlineShader, "u_textureSize");
-    const uAlpha = gl.getUniformLocation(outlineShader, "u_alpha");
-
-    gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
-    gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
-    gl.uniform1f(uOutlineWidth, isMouseOver ? 2.0 : 0.0); // Show outline when mouse is over
-    gl.uniform2i(uTextureSize, canvas.width, canvas.height);
-    gl.uniform1f(uAlpha, 1.0);
-
-    // Bind framebuffer texture
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, framebufferTexture);
-
-    // Draw quad to canvas
-    const aPosition = gl.getAttribLocation(outlineShader, "a_position");
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
-    gl.enableVertexAttribArray(aPosition);
-    gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-    saveToSessionStorage();
-
-    requestAnimationFrame(render);
-}
-
-function randomPick(probabilities: number[]): number {
-    let random = Math.random();
-    let cumulativeProb = 0;
-    for (let i = 0; i < probabilities.length; i++) {
-        cumulativeProb += probabilities[i];
-        if (random <= cumulativeProb) {
-            return i;
-        }
-    }
-    throw new Error("Invalid probabilities: " + probabilities);
-}
-
-function turnDirection(current: Direction): Direction {
-    return current === "left" ? "right" : "left";
-}
-
-function nextAction(current: Action): Action {
-    const animeIndex = ANIMATION_NAMES.indexOf(current.animation);
-    const nextIndexProb = ANIMATION_MARKOV[animeIndex];
-    const nextAnimIndex = randomPick(nextIndexProb);
-    const nextAnim = ANIMATION_NAMES[nextAnimIndex];
-
-    let nextDirection = current.direction;
-    if (current.animation === "Relax" && nextAnim === "Move") {
-        nextDirection = Math.random() < 0.4 ? turnDirection(current.direction) : current.direction;
-    }
-    return {
-        animation: nextAnim,
-        direction: nextDirection,
+    private currentAction: Action = {
+        animation: "Relax",
+        direction: "right",
         timestamp: 0
     };
-}
+    
+    private position: { x: number; y: number } = {
+        x: 0,
+        y: 1e9
+    };
 
-function handleCanvasClick(): void {
-    if (character && character.state) {
-        currentAction = {
-            animation: "Interact",
-            direction: currentAction.direction,
-            timestamp: 0,
-        };
-        character.state.setAnimation(0, "Interact", false);
-        console.log("Play action", currentAction);
+    constructor(canvasId: string, initialCharacter: CharacterResource) {
+        this.characterResource = initialCharacter;
+        this.mvp = new webgl.Matrix4();
+        
+        // Initialize canvas and WebGL
+        this.initializeCanvas(canvasId);
+        this.initializeWebGL();
+        this.setupEventListeners();
+        
+        // Load initial character
+        this.loadFromSessionStorage();
+        this.loadCharacterAssets(this.characterResource);
     }
-}
 
+    private initializeCanvas(canvasId: string): void {
+        this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+        this.canvas.style.pointerEvents = "none";
+    }
 
-function handleDragStart(e: DragEvent): void {
-    if ((e as MouseEvent).button === undefined || (e as MouseEvent).button === 0) {
-        isDragging = true;
+    private initializeWebGL(): void {
+        this.gl = this.canvas.getContext("webgl", {
+            alpha: true,
+            premultipliedAlpha: false
+        }) as WebGLRenderingContext;
+
+        if (!this.gl) {
+            throw new Error('WebGL is unavailable.');
+        }
+
+        // Set up WebGL context
+        this.gl.enable(this.gl.BLEND);
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
         
-        const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-        dragStartRelativeX = clientX - position.x;
-        dragStartRelativeY = clientY - position.y;
+        this.initFramebuffer();
         
-        // Pause any current animation
-        if (character && character.state) {
-            character.state.setAnimation(0, "Relax", true);
-            currentAction = {
-                animation: "Relax",
-                direction: currentAction.direction,
-                timestamp: 0
-            };
+        // Create WebGL objects
+        this.shader = webgl.Shader.newTwoColoredTextured(this.gl);
+        this.batcher = new webgl.PolygonBatcher(this.gl);
+        this.skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(this.gl));
+        this.assetManager = new webgl.AssetManager(this.gl, RESOURCE_PATH);
+    }
+
+    private setupEventListeners(): void {
+        this.canvas.addEventListener('click', this.handleCanvasClick.bind(this));
+        this.canvas.addEventListener('contextmenu', showContextMenu);
+        this.canvas.addEventListener('mousedown', this.handleDragStart.bind(this));
+        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        document.addEventListener('mousemove', this.handleDrag.bind(this));
+        document.addEventListener('mouseup', this.handleDragEnd.bind(this));
+        
+        // Touch events
+        this.canvas.addEventListener('touchstart', this.handleDragStart.bind(this));
+        document.addEventListener('touchmove', this.handleDrag.bind(this));
+        document.addEventListener('touchend', this.handleDragEnd.bind(this));
+    }
+
+    private initFramebuffer(): void {
+        // Create and bind framebuffer
+        this.framebuffer = this.gl.createFramebuffer()!;
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
+
+        // Create and bind texture
+        this.framebufferTexture = this.gl.createTexture()!;
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebufferTexture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+
+        // Attach texture to framebuffer
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.framebufferTexture, 0);
+
+        // Create quad buffer for second pass
+        this.quadBuffer = this.gl.createBuffer()!;
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([
+            -1, -1,  // Bottom left
+             1, -1,  // Bottom right
+            -1,  1,  // Top left
+             1,  1   // Top right
+        ]), this.gl.STATIC_DRAW);
+
+        // Create and compile outline shader
+        const vertexShader = this.gl.createShader(this.gl.VERTEX_SHADER)!;
+        this.gl.shaderSource(vertexShader, outlineVertexShader);
+        this.gl.compileShader(vertexShader);
+
+        const fragmentShader = this.gl.createShader(this.gl.FRAGMENT_SHADER)!;
+        this.gl.shaderSource(fragmentShader, outlineFragmentShader);
+        this.gl.compileShader(fragmentShader);
+
+        // Compile shaders
+        this.gl.compileShader(vertexShader);
+        if (!this.gl.getShaderParameter(vertexShader, this.gl.COMPILE_STATUS)) {
+            console.error('Vertex shader compilation failed:', this.gl.getShaderInfoLog(vertexShader));
+        }
+        this.gl.compileShader(fragmentShader);
+        if (!this.gl.getShaderParameter(fragmentShader, this.gl.COMPILE_STATUS)) {
+            console.error('Fragment shader compilation failed:', this.gl.getShaderInfoLog(fragmentShader));
+        }
+        this.outlineShader = this.gl.createProgram()!;
+        this.gl.attachShader(this.outlineShader, vertexShader);
+        this.gl.attachShader(this.outlineShader, fragmentShader);
+        this.gl.linkProgram(this.outlineShader);
+        if (!this.gl.getProgramParameter(this.outlineShader, this.gl.LINK_STATUS)) {
+            console.error('Program linking failed:', this.gl.getProgramInfoLog(this.outlineShader));
         }
     }
-}
 
-function handleDrag(e: DragEvent): void {
-    if (isDragging) {
-        const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+    public loadCharacterAssets(char: CharacterResource) {
+        this.characterResource = char;
         
-        const oldX = position.x;
-        const oldY = position.y;
-        const newX = clientX - dragStartRelativeX;
-        const newY = clientY - dragStartRelativeY;
-        
-        // Calculate velocity based on time between events
-        if (lastDragEvent) {
-            const dt = (e.timeStamp - lastDragEvent.timeStamp) / 1000;
-            if (dt > 0) {
-                velocity.x = (newX - oldX) / dt;
-                velocity.y = (newY - oldY) / dt;
+        this.assetManager.removeAll();
+        this.assetManager.loadBinary(char.skeleton);
+        this.assetManager.loadTextureAtlas(char.atlas);
+
+        // FIXME: should cancel animation frame here
+        requestAnimationFrame(this.load.bind(this));
+    }
+
+    public hideCharacter(): void {
+        if (this.canvas) {
+            // Fade out animation
+            let opacity = 1;
+            const fadeInterval = setInterval(() => {
+                opacity -= 0.1;
+                this.canvas.style.opacity = opacity.toString();
+                
+                if (opacity <= 0) {
+                    clearInterval(fadeInterval);
+                    this.canvas.style.display = 'none';
+                }
+            }, 30);
+        }
+    }
+
+    private saveToSessionStorage(): void {
+        sessionStorage.setItem('characterState', JSON.stringify({
+            position: this.position,
+            currentAction: this.currentAction,
+            characterResource: this.characterResource
+        }));
+    }
+
+    private loadFromSessionStorage(): void {
+        const saved = sessionStorage.getItem('characterState');
+        if (saved) {
+            const state = JSON.parse(saved);
+            this.position = state.position;
+            this.currentAction = state.currentAction;
+            this.characterResource = state.characterResource;
+        }
+    }
+
+    private load(): void {
+        if (this.assetManager.isLoadingComplete()) {
+            this.character = this.loadCharacter(this.characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
+            this.character.state.setAnimation(0, this.currentAction.animation, true);
+            this.character.state.update(this.currentAction.timestamp);
+
+            this.lastFrameTime = Date.now() / 1000;
+
+            requestAnimationFrame(this.render.bind(this));
+        } else {
+            console.log("Loading assets of character", this.characterResource.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
+            requestAnimationFrame(this.load.bind(this));
+        }
+    }
+
+    private loadCharacter(resource: CharacterResource, scale: number = 1.0): SpineCharacter {    
+        const atlas = this.assetManager.get(resource.atlas);
+        const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
+        const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
+
+        skeletonBinary.scale = scale;
+        const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(resource.skeleton));
+        const skeleton = new spine.Skeleton(skeletonData);
+        const bounds = this.calculateSetupPoseBounds(skeleton);
+
+        const animationStateData = new spine.AnimationStateData(skeleton.data);
+
+        // Animation transitions
+        ANIMATION_NAMES.forEach(fromAnim => {
+            ANIMATION_NAMES.forEach(toAnim => {
+                if (fromAnim !== toAnim) {
+                    animationStateData.setMix(fromAnim, toAnim, 0.3);
+                }
+            });
+        });
+
+        const animationState = new spine.AnimationState(animationStateData);
+        animationState.setAnimation(0, "Relax", true);
+
+        // Listen for animation completion
+        const self = this;
+        class AnimationStateAdapter extends spine.AnimationStateAdapter {
+            complete(entry: spine.TrackEntry): void {
+                const action = self.nextAction(self.currentAction);
+                self.currentAction = action;
+                console.log("Play action", action)
+                animationState.setAnimation(0, action.animation, true);
             }
         }
+        animationState.addListener(new AnimationStateAdapter());
+
+        // Get the minimum required width and height based on character bounds
+        const minWidth = bounds.size.x * 2;
+        const minHeight = bounds.size.y * 1.2;
         
-        // Update position
-        position.x = newX;
-        position.y = newY;
-        canvas.style.left = position.x + 'px';
-        canvas.style.top = position.y + 'px';
+        // Set canvas display size
+        this.canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
+        this.canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
         
-        lastDragEvent = e as MouseEvent;
+        // Set canvas internal resolution
+        this.canvas.width = minWidth;
+        this.canvas.height = minHeight;
         
-        // Prevent scrolling on mobile
-        if ('touches' in e) {
-            e.preventDefault();
+        // Update the projection matrix to match the new resolution
+        this.mvp.ortho2d(0, 0, this.canvas.width, this.canvas.height);
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+        // Scale up the skeleton position to match the higher resolution
+        skeleton.x = this.canvas.width / 2;
+        skeleton.y = 0;
+
+        // Update framebuffer texture size
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebufferTexture);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.canvas.width, this.canvas.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+
+        return {
+            skeleton,
+            state: animationState,
+        };
+    }
+
+    private calculateSetupPoseBounds(skeleton: spine.Skeleton) {
+        skeleton.setToSetupPose();
+        skeleton.updateWorldTransform();
+        const offset = new spine.Vector2();
+        const size = new spine.Vector2();
+        skeleton.getBounds(offset, size, []);
+        return { offset, size };
+    }
+
+    // Mouse position (client, no transform, no supersampling)
+    private currentMousePos = { x: 0, y: 0 };
+
+    private handleMouseMove(event: MouseEvent): void {
+        this.currentMousePos.x = event.clientX;
+        this.currentMousePos.y = event.clientY;
+    }
+
+    private render(): void {
+        const now = Date.now() / 1000;
+        const delta = now - this.lastFrameTime;
+        this.lastFrameTime = now;
+        this.currentAction.timestamp += delta;
+
+        // Apply physics when not dragging
+        if (!this.isDragging) {
+            // Apply gravity
+            this.velocity.y += GRAVITY * delta;
+            
+            // Apply drag
+            this.velocity.x *= DRAG;
+            this.velocity.y *= DRAG;
+            if (Math.abs(this.velocity.x) < MIN_VELOCITY) {
+                this.velocity.x = 0;
+            }
+            if (Math.abs(this.velocity.y) < MIN_VELOCITY) {
+                this.velocity.y = 0;
+            }
+            
+            // Clamp velocities
+            this.velocity.x = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, this.velocity.x));
+            this.velocity.y = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, this.velocity.y));
+            
+            // Update position
+            this.position.x += this.velocity.x * delta;
+            this.position.y += this.velocity.y * delta;
+            
+            // Window bounds collision
+            const maxX = window.innerWidth - this.canvas.offsetWidth;
+            const maxY = window.innerHeight - this.canvas.offsetHeight;
+            
+            // Bounce off walls
+            if (this.position.x < 0) {
+                this.position.x = 0;
+                this.velocity.x = -this.velocity.x * BOUNCE_DAMPING;
+            } else if (this.position.x > maxX) {
+                this.position.x = maxX;
+                this.velocity.x = -this.velocity.x * BOUNCE_DAMPING;
+            }
+            
+            // Bounce off floor/ceiling
+            if (this.position.y < 0) {
+                this.position.y = 0;
+                this.velocity.y = 0;
+            } else if (this.position.y > maxY) {
+                this.position.y = maxY;
+                this.velocity.y = 0;
+            }
         }
+
+        // Move the canvas when "Move" animation is playing
+        if (this.currentAction.animation === "Move") {
+            const movement = MOVING_SPEED * delta;
+            if (this.currentAction.direction === "left") {
+                this.position.x = Math.max(0, this.position.x - movement);
+                // Turn around when reaching left edge
+                if (this.position.x <= 0) {
+                    this.position.x = 0;
+                    this.currentAction.direction = "right";
+                }
+            } else {
+                this.position.x = this.position.x + movement;
+                // Turn around when reaching right edge
+                if (this.position.x >= window.innerWidth - this.canvas.width) {
+                    this.position.x = window.innerWidth - this.canvas.width;
+                    this.currentAction.direction = "left";
+                }
+            }
+        }
+
+        // Update canvas position to `position`
+        this.canvas.style.left = this.position.x + "px";
+        this.canvas.style.top = this.position.y + "px";
+
+        // 1st pass - render Spine character to framebuffer
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        this.gl.clearColor(0, 0, 0, 0);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+        
+        this.character.skeleton.scaleX = this.currentAction.direction === "left" ? -1 : 1;
+
+        this.character.state.update(delta);
+        this.character.state.apply(this.character.skeleton);
+        this.character.skeleton.updateWorldTransform();
+
+        this.shader.bind();
+        this.shader.setUniformi(webgl.Shader.SAMPLER, 0);
+        this.shader.setUniform4x4f(webgl.Shader.MVP_MATRIX, this.mvp.values);
+
+        this.batcher.begin(this.shader);
+        this.skeletonRenderer.premultipliedAlpha = false;
+        this.skeletonRenderer.draw(this.batcher, this.character.skeleton);
+        this.batcher.end();
+
+        this.shader.unbind();
+
+        // Read pixels before 2nd pass to determine if mouse is over character
+        const canvasRect = this.canvas.getBoundingClientRect();
+        let pixelX = (this.currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
+        let pixelY = this.canvas.height - (this.currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
+        let pixelColor = new Uint8Array(4);
+        this.gl.readPixels(
+            pixelX, 
+            pixelY, 
+            1, 1, 
+            this.gl.RGBA, 
+            this.gl.UNSIGNED_BYTE, 
+            pixelColor
+        );
+        this.isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0;
+        if (this.isMouseOver) {
+            this.canvas.style.pointerEvents = 'auto';
+        } else {
+            // Disable any mouse interaction so that the webpage content can be selected
+            this.canvas.style.pointerEvents = 'none';
+        }
+
+        // 2nd pass - render to screen with outline effect
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        this.gl.clearColor(0, 0, 0, 0);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+
+        this.gl.useProgram(this.outlineShader);
+
+        // Set uniforms
+        const uTexture = this.gl.getUniformLocation(this.outlineShader, "u_texture");
+        const uOutlineColor = this.gl.getUniformLocation(this.outlineShader, "u_outlineColor");
+        const uOutlineWidth = this.gl.getUniformLocation(this.outlineShader, "u_outlineWidth");
+        const uTextureSize = this.gl.getUniformLocation(this.outlineShader, "u_textureSize");
+        const uAlpha = this.gl.getUniformLocation(this.outlineShader, "u_alpha");
+
+        this.gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
+        this.gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
+        this.gl.uniform1f(uOutlineWidth, this.isMouseOver ? 2.0 : 0.0); // Show outline when mouse is over
+        this.gl.uniform2i(uTextureSize, this.canvas.width, this.canvas.height);
+        this.gl.uniform1f(uAlpha, 1.0);
+
+        // Bind framebuffer texture
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.framebufferTexture);
+
+        // Draw quad to canvas
+        const aPosition = this.gl.getAttribLocation(this.outlineShader, "a_position");
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quadBuffer);
+        this.gl.enableVertexAttribArray(aPosition);
+        this.gl.vertexAttribPointer(aPosition, 2, this.gl.FLOAT, false, 0, 0);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+
+        this.saveToSessionStorage();
+
+        requestAnimationFrame(this.render.bind(this));
+    }
+
+    private randomPick(probabilities: number[]): number {
+        let random = Math.random();
+        let cumulativeProb = 0;
+        for (let i = 0; i < probabilities.length; i++) {
+            cumulativeProb += probabilities[i];
+            if (random <= cumulativeProb) {
+                return i;
+            }
+        }
+        throw new Error("Invalid probabilities: " + probabilities);
+    }
+
+    private turnDirection(current: Direction): Direction {
+        return current === "left" ? "right" : "left";
+    }
+
+    private nextAction(current: Action): Action {
+        const animeIndex = ANIMATION_NAMES.indexOf(current.animation);
+        const nextIndexProb = ANIMATION_MARKOV[animeIndex];
+        const nextAnimIndex = this.randomPick(nextIndexProb);
+        const nextAnim = ANIMATION_NAMES[nextAnimIndex];
+
+        let nextDirection = current.direction;
+        if (current.animation === "Relax" && nextAnim === "Move") {
+            nextDirection = Math.random() < 0.4 ? this.turnDirection(current.direction) : current.direction;
+        }
+        return {
+            animation: nextAnim,
+            direction: nextDirection,
+            timestamp: 0
+        };
+    }
+
+    private handleCanvasClick(): void {
+        if (this.character && this.character.state) {
+            this.currentAction = {
+                animation: "Interact",
+                direction: this.currentAction.direction,
+                timestamp: 0,
+            };
+            this.character.state.setAnimation(0, "Interact", false);
+            console.log("Play action", this.currentAction);
+        }
+    }
+
+    private handleDragStart(e: MouseEvent | TouchEvent): void {
+        if ((e as MouseEvent).button === undefined || (e as MouseEvent).button === 0) {
+            this.isDragging = true;
+            
+            const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+            this.dragStartRelativeX = clientX - this.position.x;
+            this.dragStartRelativeY = clientY - this.position.y;
+            
+            // Pause any current animation
+            if (this.character && this.character.state) {
+                this.character.state.setAnimation(0, "Relax", true);
+                this.currentAction = {
+                    animation: "Relax",
+                    direction: this.currentAction.direction,
+                    timestamp: 0
+                };
+            }
+        }
+    }
+
+    private handleDrag(e: MouseEvent | TouchEvent): void {
+        if (this.isDragging) {
+            const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+            const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+            
+            const oldX = this.position.x;
+            const oldY = this.position.y;
+            const newX = clientX - this.dragStartRelativeX;
+            const newY = clientY - this.dragStartRelativeY;
+            
+            // Calculate velocity based on time between events
+            if (this.lastDragEvent) {
+                const dt = (e.timeStamp - this.lastDragEvent.timeStamp) / 1000;
+                if (dt > 0) {
+                    this.velocity.x = (newX - oldX) / dt;
+                    this.velocity.y = (newY - oldY) / dt;
+                }
+            }
+            
+            // Update position
+            this.position.x = newX;
+            this.position.y = newY;
+            this.canvas.style.left = this.position.x + 'px';
+            this.canvas.style.top = this.position.y + 'px';
+            
+            this.lastDragEvent = e as MouseEvent;
+            
+            // Prevent scrolling on mobile
+            if ('touches' in e) {
+                e.preventDefault();
+            }
+        }
+    }
+
+    private handleDragEnd(): void {
+        this.isDragging = false;
+        this.lastDragEvent = null;
     }
 }
 
-function handleDragEnd(): void {
-    isDragging = false;
-    lastDragEvent = null;
-}
-
-window.addEventListener('load', init); 
+// Usage example:
+window.addEventListener('load', () => {
+    const character = new Character(
+        "arkpets-canvas", 
+        CHARACTER_RESOURCES[0]
+    );
+    console.log("Character initialized", character);
+    createContextMenu(CHARACTER_RESOURCES, (char) => {
+        character.loadCharacterAssets(char);
+        // character.load();
+    }, () => {
+        character.hideCharacter();
+    });
+});
