@@ -111,7 +111,12 @@ export function createContextMenu(
     menu.appendChild(charactersMenu);
     menu.appendChild(hideMenu);
     menu.appendChild(aboutMenu);
+    
     document.body.appendChild(menu);
+
+    // Hide the menu when clicking anywhere on the page
+    document.addEventListener('click', hideContextMenu);
+
     return menu;
 } 
 
