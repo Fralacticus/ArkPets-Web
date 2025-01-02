@@ -200,7 +200,10 @@ export class Character {
         this.assetManager.loadBinary(char.skeleton);
         this.assetManager.loadTextureAtlas(char.atlas);
 
-        // FIXME: should cancel the current animation frame here
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
         requestAnimationFrame(this.load.bind(this));
     }
 
