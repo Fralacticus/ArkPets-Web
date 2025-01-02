@@ -44,5 +44,38 @@
     <p>Lectus suscipit etiam nunc malesuada duis eros orci. Faucibus donec sociosqu semper vel ligula sociosqu aliquam. Eros suscipit potenti morbi urna ante quis egestas dui. Posuere aliquet phasellus interdum primis in commodo. Nisl class arcu sit libero; rhoncus curae litora. Pulvinar vestibulum sem viverra pulvinar tortor rutrum per ipsum. Ullamcorper tristique mollis lobortis ipsum cras, conubia sit eu!</p>
     <canvas id="arkpets-canvas" width="500" height="500"></canvas>
     <script src="dist/bundle.js"></script>
+    <script>
+        const RESOURCE_PATH = "/assets/models/";
+
+        const CHARACTER_RESOURCES = [
+            {
+                name: "佩佩",
+                skeleton: "4058_pepe/build_char_4058_pepe.skel",
+                atlas: "4058_pepe/build_char_4058_pepe.atlas",
+                texture: "4058_pepe/build_char_4058_pepe.png",
+            },
+            {
+                name: "荒芜拉普兰德",
+                skeleton: "1038_whitw2/build_char_1038_whitw2.skel", 
+                atlas: "1038_whitw2/build_char_1038_whitw2.atlas",
+                texture: "1038_whitw2/build_char_1038_whitw2.png",
+            },
+        ];
+
+        window.addEventListener('load', () => {
+            const character = new arkpets.Character(
+                "arkpets-canvas", 
+                arkpets.showContextMenu,
+                CHARACTER_RESOURCES[0],
+                RESOURCE_PATH
+            );
+            console.log("Character initialized", character);
+            arkpets.createContextMenu(CHARACTER_RESOURCES, (char) => {
+                character.loadCharacterAssets(char);
+            }, () => {
+                character.hideCharacter();
+            });
+        });
+    </script>
 </body>
 </html>
