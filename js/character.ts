@@ -595,4 +595,35 @@ export class Character {
         this.isDragging = false;
         this.lastDragEvent = null;
     }
+
+    public destroy(): void {
+        // Remove event listeners
+        this.canvas.removeEventListener('click', this.handleCanvasClick.bind(this));
+        this.canvas.removeEventListener('mousedown', this.handleDragStart.bind(this));
+        document.removeEventListener('mousemove', this.handleMouseMove.bind(this));
+        document.removeEventListener('mousemove', this.handleDrag.bind(this));
+        document.removeEventListener('mouseup', this.handleDragEnd.bind(this));
+        this.canvas.removeEventListener('touchstart', this.handleDragStart.bind(this));
+        document.removeEventListener('touchmove', this.handleDrag.bind(this));
+        document.removeEventListener('touchend', this.handleDragEnd.bind(this));
+
+        // Delete WebGL resources
+        this.gl.deleteFramebuffer(this.framebuffer);
+        this.gl.deleteTexture(this.framebufferTexture);
+        this.gl.deleteBuffer(this.quadBuffer);
+        this.gl.deleteProgram(this.outlineShader);
+        
+        // Clean up Spine resources
+        if (this.character) {
+            this.character.state.clearTracks();
+            this.character.state.clearListeners();
+        }
+        
+        // Clear session storage
+        sessionStorage.removeItem('arkpets-character-' + this.canvas.id);
+        
+        // Clear asset manager
+        this.assetManager.removeAll();
+        this.assetManager.dispose();
+    }
 }
