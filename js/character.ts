@@ -219,7 +219,7 @@ export class Character {
     }
 
     private saveToSessionStorage(): void {
-        sessionStorage.setItem('characterState', JSON.stringify({
+        sessionStorage.setItem('arkpets-character-' + this.canvas.id, JSON.stringify({
             position: this.position,
             currentAction: this.currentAction,
             characterResource: this.characterResource
@@ -227,7 +227,7 @@ export class Character {
     }
 
     private loadFromSessionStorage(): void {
-        const saved = sessionStorage.getItem('characterState');
+        const saved = sessionStorage.getItem('arkpets-character-' + this.canvas.id);
         if (saved) {
             const state = JSON.parse(saved);
             this.position = state.position;
