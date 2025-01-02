@@ -76,6 +76,8 @@ export class Character {
         y: 1e9
     };
 
+    private animationFrameId: number | null = null;
+
     constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterResource, resourcePath?: string) {
         this.characterResource = initialCharacter;
         this.mvp = new webgl.Matrix4();
@@ -202,9 +204,8 @@ export class Character {
         requestAnimationFrame(this.load.bind(this));
     }
 
-    public hideCharacter(): void {
-        if (this.canvas) {
-            // Fade out animation
+    public fadeOut(): Promise<void> {
+        return new Promise((resolve) => {
             let opacity = 1;
             const fadeInterval = setInterval(() => {
                 opacity -= 0.1;
@@ -212,10 +213,10 @@ export class Character {
                 
                 if (opacity <= 0) {
                     clearInterval(fadeInterval);
-                    this.canvas.style.display = 'none';
+                    resolve();
                 }
             }, 30);
-        }
+        });
     }
 
     private saveToSessionStorage(): void {
@@ -488,7 +489,8 @@ export class Character {
 
         this.saveToSessionStorage();
 
-        requestAnimationFrame(this.render.bind(this));
+        // Store the animation frame ID
+        this.animationFrameId = requestAnimationFrame(this.render.bind(this));
     }
 
     private randomPick(probabilities: number[]): number {
@@ -597,6 +599,11 @@ export class Character {
     }
 
     public destroy(): void {
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+
         // Remove event listeners
         this.canvas.removeEventListener('click', this.handleCanvasClick.bind(this));
         this.canvas.removeEventListener('mousedown', this.handleDragStart.bind(this));
@@ -607,17 +614,17 @@ export class Character {
         document.removeEventListener('touchmove', this.handleDrag.bind(this));
         document.removeEventListener('touchend', this.handleDragEnd.bind(this));
 
-        // Delete WebGL resources
-        this.gl.deleteFramebuffer(this.framebuffer);
-        this.gl.deleteTexture(this.framebufferTexture);
-        this.gl.deleteBuffer(this.quadBuffer);
-        this.gl.deleteProgram(this.outlineShader);
-        
         // Clean up Spine resources
         if (this.character) {
             this.character.state.clearTracks();
             this.character.state.clearListeners();
         }
+        
+        // Delete WebGL resources
+        this.gl.deleteFramebuffer(this.framebuffer);
+        this.gl.deleteTexture(this.framebufferTexture);
+        this.gl.deleteBuffer(this.quadBuffer);
+        this.gl.deleteProgram(this.outlineShader);
         
         // Clear session storage
         sessionStorage.removeItem('arkpets-character-' + this.canvas.id);

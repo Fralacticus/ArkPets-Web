@@ -73,7 +73,10 @@
             arkpets.createContextMenu(CHARACTER_RESOURCES, (char) => {
                 character.loadCharacterAssets(char);
             }, () => {
-                character.hideCharacter();
+                character.fadeOut().then(() => {
+                    character.destroy();
+                    document.getElementById("arkpets-canvas").remove();
+                });
             });
         });
     </script>
