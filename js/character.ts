@@ -72,8 +72,8 @@ export class Character {
     };
     
     private position: { x: number; y: number } = {
-        x: 0,
-        y: 1e9
+        x: -1, // will be set to a random value
+        y: 1e9 // will be bounded to the bottom of the window
     };
 
     private animationFrameId: number | null = null;
@@ -254,6 +254,11 @@ export class Character {
 
             this.lastFrameTime = Date.now() / 1000;
 
+            // Generate random x position if it's not set yet
+            if (this.position.x === -1) {
+                this.position.x = Math.random() * (window.innerWidth - this.canvas.offsetWidth);
+            }
+
             requestAnimationFrame(this.render.bind(this));
         } else {
             console.log("Loading assets of character", this.characterResource.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
@@ -409,8 +414,8 @@ export class Character {
             } else {
                 this.position.x = this.position.x + movement;
                 // Turn around when reaching right edge
-                if (this.position.x >= window.innerWidth - this.canvas.width) {
-                    this.position.x = window.innerWidth - this.canvas.width;
+                if (this.position.x >= window.innerWidth - this.canvas.offsetWidth) {
+                    this.position.x = window.innerWidth - this.canvas.offsetWidth;
                     this.currentAction.direction = "left";
                 }
             }
