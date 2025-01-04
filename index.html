@@ -64,9 +64,9 @@
                 RESOURCE_PATH
             );
             console.log("Character initialized", character);
-            arkpets.createContextMenu(CHARACTER_RESOURCES, (char) => {
+            arkpets.createContextMenu(CHARACTER_RESOURCES, (canvasId, char) => {
                 character.loadCharacterAssets(char);
-            }, () => {
+            }, (canvasId) => {
                 character.fadeOut().then(() => {
                     character.destroy();
                 });

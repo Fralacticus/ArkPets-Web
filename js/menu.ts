@@ -3,6 +3,9 @@ import { CharacterResource } from './types';
 // Singleton
 let menu: HTMLElement;
 
+// The canvas id of the character that the menu is currently clicked on
+let canvasId: string;
+
 interface MenuItemStyle {
     padding: string;
     cursor: string;
@@ -10,8 +13,8 @@ interface MenuItemStyle {
 
 export function createContextMenu(
     characterResources: CharacterResource[],
-    onCharacterSelect: (char: CharacterResource) => void,
-    onHideCharacter: () => void
+    onCharacterSelect: (canvasId: string, char: CharacterResource) => void,
+    onHideCharacter: (canvasId: string) => void
 ): HTMLElement {
     menu = document.createElement('div');
     
@@ -70,7 +73,7 @@ export function createContextMenu(
         applyMenuItemStyles(item);
         item.onclick = () => {
             menu.style.display = 'none';
-            onCharacterSelect(char);
+            onCharacterSelect(canvasId, char);
         };
         charactersList.appendChild(item);
     });
@@ -102,7 +105,7 @@ export function createContextMenu(
     hideMenu.innerHTML = 'Hide';
     hideMenu.onclick = () => {
         menu.style.display = 'none';
-        onHideCharacter();
+        onHideCharacter(canvasId);
     };
 
     // Apply to Hide menu
@@ -136,6 +139,8 @@ export function showContextMenu(e: MouseEvent | TouchEvent): void {
     menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
     menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
     menu.style.opacity = '1';
+
+    canvasId = (e.currentTarget as HTMLCanvasElement).id;
 }
 
 export function hideContextMenu(): void {
