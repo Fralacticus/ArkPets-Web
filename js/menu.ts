@@ -28,31 +28,12 @@ export function createContextMenu(
     menu.style.boxShadow = '2px 2px 5px rgba(0,0,0,0.2)';
     menu.style.fontSize = '14px';
     
-    // Create Characters submenu
-    const charactersMenu = document.createElement('div');
-    charactersMenu.className = 'arkpets-menu-item';
-    charactersMenu.innerHTML = 'Characters ▶';
-    charactersMenu.style.padding = '5px 20px';
-    charactersMenu.style.cursor = 'pointer';
-    
-    const charactersList = document.createElement('div');
-    charactersList.className = 'submenu';
-    charactersList.style.display = 'none';
-    charactersList.style.position = 'absolute';
-    charactersList.style.left = '100%';
-    charactersList.style.top = '0';
-    charactersList.style.backgroundColor = 'white';
-    charactersList.style.border = '1px solid #ccc';
-    charactersList.style.padding = '5px 0';
-    charactersList.style.minWidth = '150px';
-    
-    // Add hover styles to menu items
-    const menuItemStyle: MenuItemStyle = {
-        padding: '5px 20px',
-        cursor: 'pointer',
-    };
-
     const applyMenuItemStyles = (element: HTMLElement) => {
+        // Add hover styles to menu items
+        const menuItemStyle: MenuItemStyle = {
+            padding: '5px 20px',
+            cursor: 'pointer',
+        };
         Object.assign(element.style, menuItemStyle);
         const originalMouseover = element.onmouseover;
         const originalMouseout = element.onmouseout;
@@ -65,26 +46,47 @@ export function createContextMenu(
             if (originalMouseout) originalMouseout.call(element, e);
         };
     };
+    
 
-    // Apply to character list items
-    characterResources.forEach(char => {
-        const item = document.createElement('div');
-        item.innerHTML = char.name;
-        applyMenuItemStyles(item);
-        item.onclick = () => {
-            menu.style.display = 'none';
-            onCharacterSelect(canvasId, char);
-        };
-        charactersList.appendChild(item);
-    });
-    
-    charactersMenu.appendChild(charactersList);
-    charactersMenu.onmouseover = () => charactersList.style.display = 'block';
-    charactersMenu.onmouseout = () => charactersList.style.display = 'none';
-    
-    // Apply to Characters menu
-    applyMenuItemStyles(charactersMenu);
-    
+    if (characterResources.length > 0) {
+        // Create Characters submenu if provided
+        const charactersMenu = document.createElement('div');
+        charactersMenu.className = 'arkpets-menu-item';
+        charactersMenu.innerHTML = 'Characters ▶';
+        charactersMenu.style.padding = '5px 20px';
+        charactersMenu.style.cursor = 'pointer';
+        
+        const charactersList = document.createElement('div');
+        charactersList.className = 'submenu';
+        charactersList.style.display = 'none';
+        charactersList.style.position = 'absolute';
+        charactersList.style.left = '100%';
+        charactersList.style.top = '0';
+        charactersList.style.backgroundColor = 'white';
+        charactersList.style.border = '1px solid #ccc';
+        charactersList.style.padding = '5px 0';
+        charactersList.style.minWidth = '150px';
+        
+        // Apply to character list items
+        characterResources.forEach(char => {
+            const item = document.createElement('div');
+            item.innerHTML = char.name;
+            applyMenuItemStyles(item);
+            item.onclick = () => {
+                menu.style.display = 'none';
+                onCharacterSelect(canvasId, char);
+            };
+            charactersList.appendChild(item);
+        });
+        
+        charactersMenu.appendChild(charactersList);
+        charactersMenu.onmouseover = () => charactersList.style.display = 'block';
+        charactersMenu.onmouseout = () => charactersList.style.display = 'none';
+        
+        applyMenuItemStyles(charactersMenu);
+        menu.appendChild(charactersMenu);
+    }
+
     // Create About menu item
     const aboutMenu = document.createElement('div');
     aboutMenu.className = 'arkpets-menu-item';
@@ -95,8 +97,6 @@ export function createContextMenu(
         menu.style.display = 'none';
         window.open('https://github.com/fuyufjh/ArkPets-Web/', '_blank');
     };
-
-    // Apply to About menu
     applyMenuItemStyles(aboutMenu);
 
     // Create Hide menu item
@@ -107,11 +107,8 @@ export function createContextMenu(
         menu.style.display = 'none';
         onHideCharacter(canvasId);
     };
-
-    // Apply to Hide menu
     applyMenuItemStyles(hideMenu);
     
-    menu.appendChild(charactersMenu);
     menu.appendChild(hideMenu);
     menu.appendChild(aboutMenu);
     
