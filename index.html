@@ -27,12 +27,6 @@
             margin-right: auto;
             padding: 0 15px;
         }
-        #arkpets-canvas {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            z-index: 100;
-        }
     </style>
 </head>
 <body>
@@ -64,7 +58,7 @@
 
         window.addEventListener('load', () => {
             const character = new arkpets.Character(
-                "arkpets-canvas", 
+                "arkpets-demo", 
                 arkpets.showContextMenu,
                 CHARACTER_RESOURCES[0],
                 RESOURCE_PATH
@@ -75,7 +69,6 @@
             }, () => {
                 character.fadeOut().then(() => {
                     character.destroy();
-                    document.getElementById("arkpets-canvas").remove();
                 });
             });
         });

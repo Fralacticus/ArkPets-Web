@@ -93,8 +93,14 @@ export class Character {
     }
 
     private initializeCanvas(canvasId: string): void {
-        this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = canvasId;
+        document.body.appendChild(this.canvas);
         this.canvas.style.pointerEvents = "none";
+        this.canvas.style.position = "fixed";
+        this.canvas.style.bottom = "0";
+        this.canvas.style.left = "0";
+        this.canvas.style.zIndex = "100";
     }
 
     private initializeWebGL(resourcePath?: string): void {
@@ -635,5 +641,8 @@ export class Character {
         // Clear asset manager
         this.assetManager.removeAll();
         this.assetManager.dispose();
+
+        // Remove canvas
+        this.canvas.remove();
     }
 }
