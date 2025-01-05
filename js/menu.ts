@@ -1,4 +1,4 @@
-import { CharacterResource } from './types';
+import { CharacterModel } from './types';
 
 // Singleton
 let menu: HTMLElement;
@@ -12,8 +12,8 @@ interface MenuItemStyle {
 }
 
 export function createContextMenu(
-    characterResources: CharacterResource[],
-    onCharacterSelect: (canvasId: string, char: CharacterResource) => void,
+    characterResources: CharacterModel[],
+    onCharacterSelect: (canvasId: string, char: CharacterModel) => void,
     onHideCharacter: (canvasId: string) => void
 ): HTMLElement {
     menu = document.createElement('div');

@@ -1,4 +1,4 @@
-export interface CharacterResource {
+export interface CharacterModel {
     name: string;
     skeleton: string;
     atlas: string;

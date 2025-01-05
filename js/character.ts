@@ -2,7 +2,7 @@ import spine from '../libs/spine-webgl.js';
 import webgl = spine.webgl;
 import outlineFragmentShader from '../shaders/OutlineFragment.glsl';
 import outlineVertexShader from '../shaders/OutlineVertex.glsl';
-import { CharacterResource } from './types.js';
+import { CharacterModel } from './types.js';
 
 // Supersampling is necessary for high-res display
 const SUPERSAMPLE_FACTOR = 2;
@@ -62,7 +62,7 @@ export class Character {
     // Physics state
     private velocity = { x: 0, y: 0 };
     
-    private characterResource: CharacterResource;
+    private characterResource: CharacterModel;
     private character!: SpineCharacter;
     
     private currentAction: Action = {
@@ -78,7 +78,7 @@ export class Character {
 
     private animationFrameId: number | null = null;
 
-    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterResource) {
+    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel) {
         this.characterResource = initialCharacter;
         this.mvp = new webgl.Matrix4();
         
@@ -199,7 +199,7 @@ export class Character {
         }
     }
 
-    public loadCharacterAssets(char: CharacterResource) {
+    public loadCharacterAssets(char: CharacterModel) {
         this.characterResource = char;
         
         this.assetManager.removeAll();
@@ -267,7 +267,7 @@ export class Character {
         }
     }
 
-    private loadCharacter(resource: CharacterResource, scale: number = 1.0): SpineCharacter {    
+    private loadCharacter(resource: CharacterModel, scale: number = 1.0): SpineCharacter {    
         const prefix = resource.resourcePath ? resource.resourcePath + "/" : "";
         const atlas = this.assetManager.get(prefix + resource.atlas);
         const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
