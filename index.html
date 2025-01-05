@@ -47,12 +47,14 @@
                 skeleton: "4058_pepe/build_char_4058_pepe.skel",
                 atlas: "4058_pepe/build_char_4058_pepe.atlas",
                 texture: "4058_pepe/build_char_4058_pepe.png",
+                resourcePath: RESOURCE_PATH,
             },
             {
                 name: "荒芜拉普兰德",
                 skeleton: "1038_whitw2/build_char_1038_whitw2.skel", 
                 atlas: "1038_whitw2/build_char_1038_whitw2.atlas",
                 texture: "1038_whitw2/build_char_1038_whitw2.png",
+                resourcePath: RESOURCE_PATH,
             },
         ];
 
@@ -61,7 +63,6 @@
                 "arkpets-demo", 
                 arkpets.showContextMenu,
                 CHARACTER_RESOURCES[0],
-                RESOURCE_PATH
             );
             console.log("Character initialized", character);
             arkpets.createContextMenu(CHARACTER_RESOURCES, (canvasId, char) => {

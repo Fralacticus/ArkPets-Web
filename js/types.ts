@@ -3,4 +3,5 @@ export interface CharacterResource {
     skeleton: string;
     atlas: string;
     texture: string;
-} 
+    resourcePath?: string;
+}

@@ -78,13 +78,13 @@ export class Character {
 
     private animationFrameId: number | null = null;
 
-    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterResource, resourcePath?: string) {
+    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterResource) {
         this.characterResource = initialCharacter;
         this.mvp = new webgl.Matrix4();
         
         // Initialize canvas and WebGL
         this.initializeCanvas(canvasId);
-        this.initializeWebGL(resourcePath);
+        this.initializeWebGL();
         this.setupEventListeners(onContextMenu);
         
         // Load initial character
@@ -103,7 +103,7 @@ export class Character {
         this.canvas.style.zIndex = "100";
     }
 
-    private initializeWebGL(resourcePath?: string): void {
+    private initializeWebGL(): void {
         this.gl = this.canvas.getContext("webgl", {
             alpha: true,
             premultipliedAlpha: false
@@ -123,7 +123,7 @@ export class Character {
         this.shader = webgl.Shader.newTwoColoredTextured(this.gl);
         this.batcher = new webgl.PolygonBatcher(this.gl);
         this.skeletonRenderer = new webgl.SkeletonRenderer(new webgl.ManagedWebGLRenderingContext(this.gl));
-        this.assetManager = new webgl.AssetManager(this.gl, resourcePath);
+        this.assetManager = new webgl.AssetManager(this.gl);
     }
 
     private setupEventListeners(onContextMenu: (e: MouseEvent | TouchEvent) => void): void {
@@ -203,8 +203,9 @@ export class Character {
         this.characterResource = char;
         
         this.assetManager.removeAll();
-        this.assetManager.loadBinary(char.skeleton);
-        this.assetManager.loadTextureAtlas(char.atlas);
+        const prefix = char.resourcePath ? char.resourcePath + "/" : "";
+        this.assetManager.loadBinary(prefix + char.skeleton);
+        this.assetManager.loadTextureAtlas(prefix + char.atlas);
 
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
@@ -267,12 +268,13 @@ export class Character {
     }
 
     private loadCharacter(resource: CharacterResource, scale: number = 1.0): SpineCharacter {    
-        const atlas = this.assetManager.get(resource.atlas);
+        const prefix = resource.resourcePath ? resource.resourcePath + "/" : "";
+        const atlas = this.assetManager.get(prefix + resource.atlas);
         const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
         const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
 
         skeletonBinary.scale = scale;
-        const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(resource.skeleton));
+        const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(prefix + resource.skeleton));
         const skeleton = new spine.Skeleton(skeletonData);
         const bounds = this.calculateSetupPoseBounds(skeleton);
 
