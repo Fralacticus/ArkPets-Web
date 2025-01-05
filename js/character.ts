@@ -216,51 +216,32 @@ export class Character {
         function encodeUriPath(path: string): string {
             return encodeURIComponent(path).replace(/%2F/g, '/');
         }
-        // Download all resources in parallel
-        const resourcePromises = [
-            fetch((char.resourcePath ?? "") + encodeUriPath(char.skeleton)),
-            fetch((char.resourcePath ?? "") + encodeUriPath(char.atlas)),
-            fetch((char.resourcePath ?? "") + encodeUriPath(char.texture))
-        ];
-
         console.log("Downloading character assets for", char.name);
 
-        Promise.all(resourcePromises).then(async responses => {
-            const [skeletonBlob, atlasBlob, textureBlob] = await Promise.all([
-                responses[0].blob(),
-                responses[1].blob(),
-                responses[2].blob()
-            ]);
-
-            const [skeletonDataUrl, atlasDataUrl, textureDataUrl] = await Promise.all([
-                new Promise<string>(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(skeletonBlob);
-                }),
-                new Promise<string>(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(atlasBlob);
-                }),
-                new Promise<string>(resolve => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(textureBlob);
-                })
-            ]);
-
-            this.assetManager.setRawDataURI(char.skeleton, skeletonDataUrl);
-            this.assetManager.setRawDataURI(char.atlas, atlasDataUrl);
-            this.assetManager.setRawDataURI(char.texture, textureDataUrl);
+        // Download all resources.
+        // Here we use `setRawDataURI()` to manually load the resources because the path may contain `#` which is not allowed in URLs
+        const resources = [char.skeleton, char.atlas, char.texture];
+        const basePath = char.resourcePath ?? "";
+        Promise.all(resources.map(async resource => {
+            const response = await fetch(basePath + encodeUriPath(resource));
+            const blob = await response.blob();
+            const reader = new FileReader();
+            return new Promise<string>(resolve => {
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+            });
+        })).then(dataUrls => {
+            resources.forEach((resource, i) => {
+                this.assetManager.setRawDataURI(resource, dataUrls[i]);
+            });
 
             this.assetManager.removeAll();
             this.assetManager.loadBinary(char.skeleton, () => {
                 this.assetManager.loadTextureAtlas(char.atlas, () => {
                     console.log("Loaded character assets for", char.name);
-                    this.assetManager.setRawDataURI(char.skeleton, "");
-                    this.assetManager.setRawDataURI(char.atlas, "");
-                    this.assetManager.setRawDataURI(char.texture, "");
+                    resources.forEach((resource) => {
+                        this.assetManager.setRawDataURI(resource, ""); // release memory
+                    });
                     requestAnimationFrame(this.load.bind(this));
                 });
             });
