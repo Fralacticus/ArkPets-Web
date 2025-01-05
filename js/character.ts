@@ -322,7 +322,6 @@ export class Character {
         skeletonBinary.scale = scale;
         const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(resource.skeleton));
         const skeleton = new spine.Skeleton(skeletonData);
-        const bounds = this.calculateSetupPoseBounds(skeleton);
 
         if (!skeletonData.findAnimation("Sit") || !skeletonData.findAnimation("Sleep")) {
             this.isVehicle = true;
@@ -354,9 +353,9 @@ export class Character {
         }
         animationState.addListener(new AnimationStateAdapter());
 
-        // Get the minimum required width and height based on character bounds
-        const minWidth = bounds.size.x * 2;
-        const minHeight = bounds.size.y * 1.2;
+        // Use fixed size for now
+        const minWidth = 300;
+        const minHeight = 300;
         
         // Set canvas display size
         this.canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
@@ -382,15 +381,6 @@ export class Character {
             skeleton,
             state: animationState,
         };
-    }
-
-    private calculateSetupPoseBounds(skeleton: spine.Skeleton) {
-        skeleton.setToSetupPose();
-        skeleton.updateWorldTransform();
-        const offset = new spine.Vector2();
-        const size = new spine.Vector2();
-        skeleton.getBounds(offset, size, []);
-        return { offset, size };
     }
 
     // Mouse position (client, no transform, no supersampling)
