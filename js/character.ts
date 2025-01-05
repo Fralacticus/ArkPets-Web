@@ -721,4 +721,8 @@ export class Character {
         this.character.state.setAnimation(0, animationName, true);
         console.debug("Play action", this.currentAction);
     }
+
+    public getCanvasId(): string {
+        return this.canvas.id;
+    }
 }
