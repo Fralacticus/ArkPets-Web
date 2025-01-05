@@ -23,9 +23,14 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.js'],
   },
   output: {
-    filename: 'bundle.js',
+    filename: 'arkpets.js',
     path: path.resolve(__dirname, 'dist'),
-    publicPath: '/dist/'
+    library: {
+      name: 'arkpets',
+      type: 'umd',
+      export: 'default',
+    },
+    globalObject: 'this',
   },
   devServer: {
     static: {
