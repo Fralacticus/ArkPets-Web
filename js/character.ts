@@ -213,16 +213,65 @@ export class Character {
     public loadCharacterAssets(char: CharacterModel) {
         this.characterResource = char;
         
-        this.assetManager.removeAll();
-        const prefix = char.resourcePath ? char.resourcePath + "/" : "";
-        this.assetManager.loadBinary(prefix + char.skeleton);
-        this.assetManager.loadTextureAtlas(prefix + char.atlas);
+        function encodeUriPath(path: string): string {
+            return encodeURIComponent(path).replace(/%2F/g, '/');
+        }
+        // Download all resources in parallel
+        const resourcePromises = [
+            fetch((char.resourcePath ?? "") + encodeUriPath(char.skeleton)),
+            fetch((char.resourcePath ?? "") + encodeUriPath(char.atlas)),
+            fetch((char.resourcePath ?? "") + encodeUriPath(char.texture))
+        ];
+
+        console.log("Downloading character assets for", char.name);
+
+        Promise.all(resourcePromises).then(async responses => {
+            const [skeletonBlob, atlasBlob, textureBlob] = await Promise.all([
+                responses[0].blob(),
+                responses[1].blob(),
+                responses[2].blob()
+            ]);
+
+            const [skeletonDataUrl, atlasDataUrl, textureDataUrl] = await Promise.all([
+                new Promise<string>(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(skeletonBlob);
+                }),
+                new Promise<string>(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(atlasBlob);
+                }),
+                new Promise<string>(resolve => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(textureBlob);
+                })
+            ]);
+
+            this.assetManager.setRawDataURI(char.skeleton, skeletonDataUrl);
+            this.assetManager.setRawDataURI(char.atlas, atlasDataUrl);
+            this.assetManager.setRawDataURI(char.texture, textureDataUrl);
+
+            this.assetManager.removeAll();
+            this.assetManager.loadBinary(char.skeleton, () => {
+                this.assetManager.loadTextureAtlas(char.atlas, () => {
+                    console.log("Loaded character assets for", char.name);
+                    this.assetManager.setRawDataURI(char.skeleton, "");
+                    this.assetManager.setRawDataURI(char.atlas, "");
+                    this.assetManager.setRawDataURI(char.texture, "");
+                    requestAnimationFrame(this.load.bind(this));
+                });
+            });
+        }).catch(error => {
+            console.error("Failed to load character assets:", error);
+        });
 
         if (this.animationFrameId !== null) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
-        requestAnimationFrame(this.load.bind(this));
     }
 
     public fadeOut(): Promise<void> {
@@ -285,13 +334,12 @@ export class Character {
     }
 
     private loadCharacter(resource: CharacterModel, scale: number = 1.0): SpineCharacter {    
-        const prefix = resource.resourcePath ? resource.resourcePath + "/" : "";
-        const atlas = this.assetManager.get(prefix + resource.atlas);
+        const atlas = this.assetManager.get(resource.atlas);
         const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
         const skeletonBinary = new spine.SkeletonBinary(atlasLoader);
 
         skeletonBinary.scale = scale;
-        const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(prefix + resource.skeleton));
+        const skeletonData = skeletonBinary.readSkeletonData(this.assetManager.get(resource.skeleton));
         const skeleton = new spine.Skeleton(skeletonData);
         const bounds = this.calculateSetupPoseBounds(skeleton);
 
