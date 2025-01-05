@@ -1,6 +1,8 @@
 import { Character } from './character';
 import { showContextMenu } from './menu';
 
+import '../styles.css';
+
 const arkpets = {
     Character,
     showContextMenu,
