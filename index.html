@@ -73,24 +73,9 @@
         ];
 
         window.addEventListener('load', () => {
-            const callbacks = {
-                characterResources: CHARACTER_RESOURCES,
-                onCharacterSelect: (canvasId, char) => {
-                    character.loadCharacterAssets(char);
-                },
-                onHideCharacter: (canvasId) => {
-                    character.fadeOut().then(() => {
-                        character.destroy();
-                    });
-                },
-                onPlayAnimation: (canvasId, animation) => {
-                    character.playAnimation(animation);
-                }
-            };
-
             const character = new arkpets.Character(
                 "arkpets-demo", 
-                (e) => arkpets.showContextMenu(e, callbacks),
+                (e) => arkpets.showContextMenu(e, character, CHARACTER_RESOURCES),
                 CHARACTER_RESOURCES[0],
             );
             console.log("Character initialized", character);

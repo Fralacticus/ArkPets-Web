@@ -100,7 +100,7 @@ export class Character {
         
         // Load initial character
         this.loadFromSessionStorage();
-        this.loadCharacterAssets(this.characterResource);
+        this.loadCharacterModel(this.characterResource);
     }
 
     private initializeCanvas(canvasId: string): void {
@@ -210,7 +210,7 @@ export class Character {
         }
     }
 
-    public loadCharacterAssets(char: CharacterModel) {
+    public loadCharacterModel(char: CharacterModel) {
         this.characterResource = char;
         
         function encodeUriPath(path: string): string {
@@ -703,7 +703,8 @@ export class Character {
         this.canvas.remove();
     }
 
-    private getAnimationNames(): string[] {
+    public getAnimationNames(): string[] {
+        console.log("getAnimationNames", this.isVehicle ? ANIMATION_NAMES_VEHICLE : ANIMATION_NAMES);
         return this.isVehicle ? ANIMATION_NAMES_VEHICLE : ANIMATION_NAMES;
     }
 
