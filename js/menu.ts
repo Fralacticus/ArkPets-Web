@@ -1,6 +1,14 @@
 import { Character } from './character';
 import { CharacterModel } from './types';
 
+import '../styles.css';
+
+interface MenuCallbacks {
+    getCharacterModels?: () => CharacterModel[];
+    onSelectCharacter?: (c: Character, model: CharacterModel) => void;
+    onHideCharacter?: (c: Character) => void;
+}
+
 function positionElement(element: HTMLElement, x: number, y: number, parentRect?: DOMRect): void {
     const { innerWidth, innerHeight } = window;
     const { offsetWidth, offsetHeight } = element;
@@ -24,17 +32,18 @@ function positionElement(element: HTMLElement, x: number, y: number, parentRect?
     element.style.top = `${top}px`;
 }
 
-function createCharactersSubmenu(character: Character, models: CharacterModel[]): HTMLElement {
+function createCharactersSubmenu(c: Character, models: CharacterModel[], callbacks: MenuCallbacks): HTMLElement {
     const charactersList = document.createElement('div');
     charactersList.className = 'arkpets-submenu';
     
-    models.forEach(char => {
+    models.forEach(model => {
         const item = document.createElement('div');
-        item.innerHTML = char.name;
+        item.innerHTML = model.name;
         item.classList.add('arkpets-menu-item');
         item.onclick = () => {
             removeMenu();
-            character.loadCharacterModel(char);
+            c.loadCharacterModel(model);
+            callbacks.onSelectCharacter?.(c, model);
         };
         charactersList.appendChild(item);
     });
@@ -42,17 +51,17 @@ function createCharactersSubmenu(character: Character, models: CharacterModel[])
     return charactersList;
 }
 
-function createActionsSubmenu(character: Character): HTMLElement {
+function createActionsSubmenu(c: Character): HTMLElement {
     const actionsList = document.createElement('div');
     actionsList.className = 'arkpets-submenu';
     
-    character.getAnimationNames().forEach(animation => {
+    c.getAnimationNames().forEach(animation => {
         const item = document.createElement('div');
         item.innerHTML = animation;
         item.classList.add('arkpets-menu-item');
         item.onclick = () => {
             removeMenu();
-            character.playAnimation(animation);
+            c.playAnimation(animation);
         };
         actionsList.appendChild(item);
     });
@@ -60,7 +69,7 @@ function createActionsSubmenu(character: Character): HTMLElement {
     return actionsList;
 }
 
-export function showContextMenu(e: MouseEvent | TouchEvent, character: Character, models?: CharacterModel[]): void {
+export function showContextMenu(e: MouseEvent | TouchEvent, c: Character, callbacks: MenuCallbacks): void {
     e.preventDefault();
     
     // Remove existing menu if it exists
@@ -76,6 +85,7 @@ export function showContextMenu(e: MouseEvent | TouchEvent, character: Character
     };
 
     // Add Characters submenu if there are characters
+    const models = callbacks.getCharacterModels?.();
     if (models && models.length > 0) {
         const charactersMenu = document.createElement('div');
         charactersMenu.className = 'arkpets-menu-item';
@@ -84,7 +94,7 @@ export function showContextMenu(e: MouseEvent | TouchEvent, character: Character
         let charactersList: HTMLElement | null = null;
         charactersMenu.onmouseover = () => {
             if (!charactersList) {
-                charactersList = createCharactersSubmenu(character, models);
+                charactersList = createCharactersSubmenu(c, models, callbacks);
                 charactersMenu.appendChild(charactersList);
                 // Position submenu relative to its parent
                 const rect = charactersMenu.getBoundingClientRect();
@@ -110,7 +120,7 @@ export function showContextMenu(e: MouseEvent | TouchEvent, character: Character
     let actionsList: HTMLElement | null = null;
     actionsMenu.onmouseover = () => {
         if (!actionsList) {
-            actionsList = createActionsSubmenu(character);
+            actionsList = createActionsSubmenu(c);
             actionsMenu.appendChild(actionsList);
             // Position submenu relative to its parent
             const rect = actionsMenu.getBoundingClientRect();
@@ -133,9 +143,10 @@ export function showContextMenu(e: MouseEvent | TouchEvent, character: Character
     hideMenu.innerHTML = 'Hide';
     hideMenu.onclick = () => {
         removeMenu();
-        character.fadeOut().then(() => {
-            character.destroy();
+        c.fadeOut().then(() => {
+            c.destroy();
         });
+        callbacks.onHideCharacter?.(c);
     };
     applyMenuItemStyles(hideMenu);
     
