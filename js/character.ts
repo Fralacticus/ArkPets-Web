@@ -24,6 +24,14 @@ const ANIMATION_MARKOV = [
     [0.3, 0.0, 0.0, 0.0, 0.7],
 ]
 
+// Vehicle can't sit & sleep
+const ANIMATION_NAMES_VECHICLE = ["Relax", "Interact", "Move"];
+const ANIMATION_MARKOV_VECHICLE = [
+    [0.5, 0.0, 0.5],
+    [1.0, 0.0, 0.0],
+    [0.3, 0.0, 0.7],
+]
+
 interface SpineCharacter {
     skeleton: spine.Skeleton;
     state: spine.AnimationState;
@@ -77,6 +85,9 @@ export class Character {
     };
 
     private animationFrameId: number | null = null;
+
+    // Vehicle can't sit & sleep
+    private isVehicle: boolean = false;
 
     constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel) {
         this.characterResource = initialCharacter;
@@ -250,6 +261,12 @@ export class Character {
     private load(): void {
         if (this.assetManager.isLoadingComplete()) {
             this.character = this.loadCharacter(this.characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
+
+            if (!this.getAnimationNames().includes(this.currentAction.animation)) {
+                // If swithing from character to vehicle, make sure it's not in `Sleep` or `Sit`
+                this.currentAction.animation = "Relax";
+                this.currentAction.timestamp = 0;
+            }
             this.character.state.setAnimation(0, this.currentAction.animation, true);
             this.character.state.update(this.currentAction.timestamp);
 
@@ -278,11 +295,15 @@ export class Character {
         const skeleton = new spine.Skeleton(skeletonData);
         const bounds = this.calculateSetupPoseBounds(skeleton);
 
+        if (!skeletonData.findAnimation("Sit") || !skeletonData.findAnimation("Sleep")) {
+            this.isVehicle = true;
+        }
+
         const animationStateData = new spine.AnimationStateData(skeleton.data);
 
         // Animation transitions
-        ANIMATION_NAMES.forEach(fromAnim => {
-            ANIMATION_NAMES.forEach(toAnim => {
+        this.getAnimationNames().forEach(fromAnim => {
+            this.getAnimationNames().forEach(toAnim => {
                 if (fromAnim !== toAnim) {
                     animationStateData.setMix(fromAnim, toAnim, 0.3);
                 }
@@ -526,10 +547,10 @@ export class Character {
     }
 
     private nextAction(current: Action): Action {
-        const animeIndex = ANIMATION_NAMES.indexOf(current.animation);
-        const nextIndexProb = ANIMATION_MARKOV[animeIndex];
+        const animeIndex = this.getAnimationNames().indexOf(current.animation);
+        const nextIndexProb = this.getAnimationMarkov()[animeIndex];
         const nextAnimIndex = this.randomPick(nextIndexProb);
-        const nextAnim = ANIMATION_NAMES[nextAnimIndex];
+        const nextAnim = this.getAnimationNames()[nextAnimIndex];
 
         let nextDirection = current.direction;
         if (current.animation === "Relax" && nextAnim === "Move") {
@@ -651,5 +672,13 @@ export class Character {
 
         // Remove canvas
         this.canvas.remove();
+    }
+
+    private getAnimationNames(): string[] {
+        return this.isVehicle ? ANIMATION_NAMES_VECHICLE : ANIMATION_NAMES;
+    }
+
+    private getAnimationMarkov(): number[][] {
+        return this.isVehicle ? ANIMATION_MARKOV_VECHICLE : ANIMATION_MARKOV;
     }
 }
