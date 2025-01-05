@@ -25,8 +25,8 @@ const ANIMATION_MARKOV = [
 ]
 
 // Vehicle can't sit & sleep
-const ANIMATION_NAMES_VECHICLE = ["Relax", "Interact", "Move"];
-const ANIMATION_MARKOV_VECHICLE = [
+const ANIMATION_NAMES_VEHICLE = ["Relax", "Interact", "Move"];
+const ANIMATION_MARKOV_VEHICLE = [
     [0.5, 0.0, 0.5],
     [1.0, 0.0, 0.0],
     [0.3, 0.0, 0.7],
@@ -675,10 +675,20 @@ export class Character {
     }
 
     private getAnimationNames(): string[] {
-        return this.isVehicle ? ANIMATION_NAMES_VECHICLE : ANIMATION_NAMES;
+        return this.isVehicle ? ANIMATION_NAMES_VEHICLE : ANIMATION_NAMES;
     }
 
     private getAnimationMarkov(): number[][] {
-        return this.isVehicle ? ANIMATION_MARKOV_VECHICLE : ANIMATION_MARKOV;
+        return this.isVehicle ? ANIMATION_MARKOV_VEHICLE : ANIMATION_MARKOV;
+    }
+
+    public playAnimation(animationName: string): void {
+        this.currentAction = {
+            animation: animationName,
+            direction: this.currentAction.direction,
+            timestamp: 0,
+        };
+        this.character.state.setAnimation(0, animationName, true);
+        console.debug("Play action", this.currentAction);
     }
 }

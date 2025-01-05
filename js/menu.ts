@@ -11,10 +11,20 @@ interface MenuItemStyle {
     cursor: string;
 }
 
+interface MenuCallbacks {
+    onCharacterSelect: (canvasId: string, char: CharacterModel) => void;
+    onHideCharacter: (canvasId: string) => void;
+    onPlayAnimation: (canvasId: string, animation: string) => void;
+}
+
+// TODO: use the character's animation names
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
+
 export function createContextMenu(
     characterResources: CharacterModel[],
     onCharacterSelect: (canvasId: string, char: CharacterModel) => void,
-    onHideCharacter: (canvasId: string) => void
+    onHideCharacter: (canvasId: string) => void,
+    onPlayAnimation: (canvasId: string, animation: string) => void
 ): HTMLElement {
     menu = document.createElement('div');
     
@@ -86,6 +96,41 @@ export function createContextMenu(
         applyMenuItemStyles(charactersMenu);
         menu.appendChild(charactersMenu);
     }
+
+    // Create Actions submenu
+    const actionsMenu = document.createElement('div');
+    actionsMenu.className = 'arkpets-menu-item';
+    actionsMenu.innerHTML = 'Actions ▶';
+    
+    const actionsList = document.createElement('div');
+    actionsList.className = 'submenu';
+    actionsList.style.display = 'none';
+    actionsList.style.position = 'absolute';
+    actionsList.style.left = '100%';
+    actionsList.style.top = '0';
+    actionsList.style.backgroundColor = 'white';
+    actionsList.style.border = '1px solid #ccc';
+    actionsList.style.padding = '5px 0';
+    actionsList.style.minWidth = '150px';
+    
+    // Add animation options
+    ANIMATION_NAMES.forEach(animation => {
+        const item = document.createElement('div');
+        item.innerHTML = animation;
+        applyMenuItemStyles(item);
+        item.onclick = () => {
+            menu.style.display = 'none';
+            onPlayAnimation(canvasId, animation);
+        };
+        actionsList.appendChild(item);
+    });
+    
+    actionsMenu.appendChild(actionsList);
+    actionsMenu.onmouseover = () => actionsList.style.display = 'block';
+    actionsMenu.onmouseout = () => actionsList.style.display = 'none';
+    
+    applyMenuItemStyles(actionsMenu);
+    menu.appendChild(actionsMenu);
 
     // Create About menu item
     const aboutMenu = document.createElement('div');
