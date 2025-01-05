@@ -1,145 +1,190 @@
 import { CharacterModel } from './types';
 
-// Singleton
-let menu: HTMLElement;
-
-// The canvas id of the character that the menu is currently clicked on
-let canvasId: string;
-
-interface MenuItemStyle {
-    padding: string;
-    cursor: string;
-}
-
 interface MenuCallbacks {
-    getCharacterResources: () => CharacterModel[];
-    onCharacterSelect: (char: CharacterModel) => void;
-    getAnimationNames: () => string[];
-    onHideCharacter: () => void;
-    onPlayAnimation: (animation: string) => void;
+    characterResources: CharacterModel[];
+    onCharacterSelect: (canvasId: string, char: CharacterModel) => void;
+    onHideCharacter: (canvasId: string) => void;
+    onPlayAnimation: (canvasId: string, animation: string) => void;
 }
 
 // TODO: use the character's animation names
-const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
+const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit", "Sleep"];
 
-export function createContextMenu(
-    characterResources: CharacterModel[],
-    onCharacterSelect: (canvasId: string, char: CharacterModel) => void,
-    onHideCharacter: (canvasId: string) => void,
-    onPlayAnimation: (canvasId: string, animation: string) => void
-): HTMLElement {
-    menu = document.createElement('div');
+function positionElement(element: HTMLElement, x: number, y: number, parentRect?: DOMRect): void {
+    const { innerWidth, innerHeight } = window;
+    const { offsetWidth, offsetHeight } = element;
+    
+    // Calculate position, ensuring the element stays within the window
+    let left = x;
+    const top = Math.min(y, innerHeight - offsetHeight - 1);
+
+    // For submenus, check if there's space on the right side
+    if (parentRect) {
+        // If not enough space on the right, show on the left side
+        if (x + offsetWidth > innerWidth - 1) {
+            left = parentRect.left - offsetWidth;
+        }
+    } else {
+        // For main menu, just ensure it's within bounds
+        left = Math.min(x, innerWidth - offsetWidth - 1);
+    }
+    
+    element.style.left = `${left}px`;
+    element.style.top = `${top}px`;
+}
+
+function createCharactersSubmenu(canvasId: string, callbacks: MenuCallbacks): HTMLElement {
+    const charactersList = document.createElement('div');
+    charactersList.className = 'arkpets-submenu';
+    
+    callbacks.characterResources.forEach(char => {
+        const item = document.createElement('div');
+        item.innerHTML = char.name;
+        item.classList.add('arkpets-menu-item');
+        item.onclick = () => {
+            removeMenu();
+            callbacks.onCharacterSelect(canvasId, char);
+        };
+        charactersList.appendChild(item);
+    });
+
+    return charactersList;
+}
+
+function createActionsSubmenu(canvasId: string, callbacks: MenuCallbacks): HTMLElement {
+    const actionsList = document.createElement('div');
+    actionsList.className = 'arkpets-submenu';
+    
+    ANIMATION_NAMES.forEach(animation => {
+        const item = document.createElement('div');
+        item.innerHTML = animation;
+        item.classList.add('arkpets-menu-item');
+        item.onclick = () => {
+            removeMenu();
+            callbacks.onPlayAnimation(canvasId, animation);
+        };
+        actionsList.appendChild(item);
+    });
+
+    return actionsList;
+}
+
+export function showContextMenu(e: MouseEvent | TouchEvent, callbacks: MenuCallbacks): void {
+    e.preventDefault();
+    
+    // Remove existing menu if it exists
+    if (document.getElementById('arkpets-menu')) {
+        removeMenu();
+    }
+
+    const menu = document.createElement('div');
     menu.id = 'arkpets-menu';
     
     const applyMenuItemStyles = (element: HTMLElement) => {
         element.classList.add('arkpets-menu-item');
     };
 
-    if (characterResources.length > 0) {
+    const canvasId = (e.currentTarget as HTMLCanvasElement).id;
+
+    // Add Characters submenu if there are characters
+    if (callbacks.characterResources.length > 0) {
         const charactersMenu = document.createElement('div');
         charactersMenu.className = 'arkpets-menu-item';
         charactersMenu.innerHTML = 'Characters ▶';
         
-        const charactersList = document.createElement('div');
-        charactersList.className = 'arkpets-submenu';
-        
-        // Apply to character list items
-        characterResources.forEach(char => {
-            const item = document.createElement('div');
-            item.innerHTML = char.name;
-            item.classList.add('arkpets-menu-item');
-            item.onclick = () => {
-                menu.style.display = 'none';
-                onCharacterSelect(canvasId, char);
-            };
-            charactersList.appendChild(item);
-        });
-        
-        charactersMenu.appendChild(charactersList);
-        charactersMenu.onmouseover = () => charactersList.style.display = 'block';
-        charactersMenu.onmouseout = () => charactersList.style.display = 'none';
+        let charactersList: HTMLElement | null = null;
+        charactersMenu.onmouseover = () => {
+            if (!charactersList) {
+                charactersList = createCharactersSubmenu(canvasId, callbacks);
+                charactersMenu.appendChild(charactersList);
+                // Position submenu relative to its parent
+                const rect = charactersMenu.getBoundingClientRect();
+                positionElement(charactersList, rect.right, rect.top, rect);
+            }
+            charactersList.style.display = 'block';
+        };
+        charactersMenu.onmouseout = () => {
+            if (charactersList) {
+                charactersList.style.display = 'none';
+            }
+        };
         
         applyMenuItemStyles(charactersMenu);
         menu.appendChild(charactersMenu);
     }
 
-    // Create Actions submenu
+    // Create Actions menu item
     const actionsMenu = document.createElement('div');
     actionsMenu.className = 'arkpets-menu-item';
     actionsMenu.innerHTML = 'Actions ▶';
     
-    const actionsList = document.createElement('div');
-    actionsList.className = 'arkpets-submenu';
-    
-    // Add animation options
-    ANIMATION_NAMES.forEach(animation => {
-        const item = document.createElement('div');
-        item.innerHTML = animation;
-        item.classList.add('arkpets-menu-item');
-        item.onclick = () => {
-            menu.style.display = 'none';
-            onPlayAnimation(canvasId, animation);
-        };
-        actionsList.appendChild(item);
-    });
-    
-    actionsMenu.appendChild(actionsList);
-    actionsMenu.onmouseover = () => actionsList.style.display = 'block';
-    actionsMenu.onmouseout = () => actionsList.style.display = 'none';
+    let actionsList: HTMLElement | null = null;
+    actionsMenu.onmouseover = () => {
+        if (!actionsList) {
+            actionsList = createActionsSubmenu(canvasId, callbacks);
+            actionsMenu.appendChild(actionsList);
+            // Position submenu relative to its parent
+            const rect = actionsMenu.getBoundingClientRect();
+            positionElement(actionsList, rect.right, rect.top, rect);
+        }
+        actionsList.style.display = 'block';
+    };
+    actionsMenu.onmouseout = () => {
+        if (actionsList) {
+            actionsList.style.display = 'none';
+        }
+    };
     
     applyMenuItemStyles(actionsMenu);
     menu.appendChild(actionsMenu);
 
-    // Create About menu item
-    const aboutMenu = document.createElement('div');
-    aboutMenu.className = 'arkpets-menu-item';
-    aboutMenu.innerHTML = 'About';
-    aboutMenu.onclick = () => {
-        menu.style.display = 'none';
-        window.open('https://github.com/fuyufjh/ArkPets-Web/', '_blank');
-    };
-    applyMenuItemStyles(aboutMenu);
-
-    // Create Hide menu item
+    // Add Hide menu item
     const hideMenu = document.createElement('div');
     hideMenu.className = 'arkpets-menu-item';
     hideMenu.innerHTML = 'Hide';
     hideMenu.onclick = () => {
-        menu.style.display = 'none';
-        onHideCharacter(canvasId);
+        removeMenu();
+        callbacks.onHideCharacter(canvasId);
     };
     applyMenuItemStyles(hideMenu);
+    
+    // Add About menu item
+    const aboutMenu = document.createElement('div');
+    aboutMenu.className = 'arkpets-menu-item';
+    aboutMenu.innerHTML = 'About';
+    aboutMenu.onclick = () => {
+        removeMenu();
+        window.open('https://github.com/fuyufjh/ArkPets-Web/', '_blank');
+    };
+    applyMenuItemStyles(aboutMenu);
     
     menu.appendChild(hideMenu);
     menu.appendChild(aboutMenu);
     
-    document.body.appendChild(menu);
-
-    // Hide the menu when clicking anywhere on the page
-    document.addEventListener('click', hideContextMenu);
-
-    return menu;
-} 
-
-export function showContextMenu(e: MouseEvent | TouchEvent): void {
-    e.preventDefault();
-
-    // Only position-related styles remain inline since they're dynamic
-    menu.style.opacity = '0';
-    menu.style.display = 'block';
-    const { innerWidth, innerHeight } = window;
-    const { offsetWidth, offsetHeight } = menu;
-    
+    // Position the main menu at click/touch position
     const pageX = 'touches' in e ? e.touches[0].pageX : (e as MouseEvent).pageX;
     const pageY = 'touches' in e ? e.touches[0].pageY : (e as MouseEvent).pageY;
     
-    menu.style.left = Math.min(pageX, innerWidth - offsetWidth) + 'px';
-    menu.style.top = Math.min(pageY, innerHeight - offsetHeight) + 'px';
-    menu.style.opacity = '1';
+    document.body.appendChild(menu);
+    positionElement(menu, pageX, pageY);
 
-    canvasId = (e.currentTarget as HTMLCanvasElement).id;
+    // Remove menu when clicking outside
+    const handleClickOutside = (e: MouseEvent) => {
+        if (!menu.contains(e.target as Node)) {
+            removeMenu();
+            document.removeEventListener('click', handleClickOutside);
+        }
+    };
+    
+    // Delay adding the click listener to prevent immediate removal
+    setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+    }, 0);
 }
 
-export function hideContextMenu(): void {
-    menu.style.display = 'none';
+function removeMenu(): void {
+    const menu = document.getElementById('arkpets-menu');
+    if (menu) {
+        menu.remove();
+    }
 }

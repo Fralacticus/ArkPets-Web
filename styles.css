@@ -1,7 +1,8 @@
 #arkpets-menu {
-    display: none;
     position: fixed;
-    z-index: 1000;
+    top: 0;
+    left: 0;
+    z-index: 120;
     background-color: white;
     border: 1px solid #ccc;
     padding: 5px 0;
@@ -19,12 +20,10 @@
 }
 
 .arkpets-submenu {
-    display: none;
-    position: absolute;
-    left: 100%;
-    top: 0;
+    position: fixed;
     background-color: white;
     border: 1px solid #ccc;
     padding: 5px 0;
     min-width: 150px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
 }

@@ -73,26 +73,27 @@
         ];
 
         window.addEventListener('load', () => {
-            const character = new arkpets.Character(
-                "arkpets-demo", 
-                arkpets.showContextMenu,
-                CHARACTER_RESOURCES[0],
-            );
-            console.log("Character initialized", character);
-            arkpets.createContextMenu(
-                CHARACTER_RESOURCES, 
-                (canvasId, char) => {
+            const callbacks = {
+                characterResources: CHARACTER_RESOURCES,
+                onCharacterSelect: (canvasId, char) => {
                     character.loadCharacterAssets(char);
-                }, 
-                (canvasId) => {
+                },
+                onHideCharacter: (canvasId) => {
                     character.fadeOut().then(() => {
                         character.destroy();
                     });
                 },
-                (canvasId, animation) => {
+                onPlayAnimation: (canvasId, animation) => {
                     character.playAnimation(animation);
                 }
+            };
+
+            const character = new arkpets.Character(
+                "arkpets-demo", 
+                (e) => arkpets.showContextMenu(e, callbacks),
+                CHARACTER_RESOURCES[0],
             );
+            console.log("Character initialized", character);
         });
     </script>
 </body>

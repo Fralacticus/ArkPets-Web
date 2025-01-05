@@ -1,10 +1,8 @@
 import { Character } from './character';
-import { createContextMenu, hideContextMenu, showContextMenu } from './menu';
+import { showContextMenu } from './menu';
 
 const arkpets = {
     Character,
-    createContextMenu,
-    hideContextMenu,
     showContextMenu,
 };
 
