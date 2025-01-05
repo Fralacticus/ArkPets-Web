@@ -262,7 +262,7 @@ export class Character {
 
             requestAnimationFrame(this.render.bind(this));
         } else {
-            console.log("Loading assets of character", this.characterResource.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
+            console.debug("Loading assets of character", this.characterResource.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
             requestAnimationFrame(this.load.bind(this));
         }
     }
@@ -298,7 +298,7 @@ export class Character {
             complete(entry: spine.TrackEntry): void {
                 const action = self.nextAction(self.currentAction);
                 self.currentAction = action;
-                console.log("Play action", action)
+                console.debug("Play action", action)
                 animationState.setAnimation(0, action.animation, true);
             }
         }
@@ -550,7 +550,7 @@ export class Character {
                 timestamp: 0,
             };
             this.character.state.setAnimation(0, "Interact", false);
-            console.log("Play action", this.currentAction);
+            console.debug("Play action", this.currentAction);
         }
     }
 
