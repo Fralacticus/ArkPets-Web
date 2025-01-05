@@ -42,8 +42,8 @@ function createCharactersSubmenu(c: Character, models: CharacterModel[], callbac
         item.classList.add('arkpets-menu-item');
         item.onclick = () => {
             removeMenu();
-            c.loadCharacterModel(model);
-            callbacks.onSelectCharacter?.(c, model);
+            const callback = callbacks.onSelectCharacter ?? (() => c.loadCharacterModel(model));
+            callback(c, model);
         };
         charactersList.appendChild(item);
     });
@@ -143,10 +143,12 @@ export function showContextMenu(e: MouseEvent | TouchEvent, c: Character, callba
     hideMenu.innerHTML = 'Hide';
     hideMenu.onclick = () => {
         removeMenu();
-        c.fadeOut().then(() => {
-            c.destroy();
+        const callback = callbacks.onHideCharacter ?? (() => {
+            c.fadeOut().then(() => {
+                c.destroy();
+            });
         });
-        callbacks.onHideCharacter?.(c);
+        callback(c);
     };
     applyMenuItemStyles(hideMenu);
     
