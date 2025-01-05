@@ -704,7 +704,6 @@ export class Character {
     }
 
     public getAnimationNames(): string[] {
-        console.log("getAnimationNames", this.isVehicle ? ANIMATION_NAMES_VEHICLE : ANIMATION_NAMES);
         return this.isVehicle ? ANIMATION_NAMES_VEHICLE : ANIMATION_NAMES;
     }
 
