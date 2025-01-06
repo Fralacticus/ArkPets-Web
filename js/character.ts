@@ -70,7 +70,7 @@ export class Character {
     // Physics state
     private velocity = { x: 0, y: 0 };
     
-    private characterResource: CharacterModel;
+    private model: CharacterModel;
     private character!: SpineCharacter;
     
     private currentAction: Action = {
@@ -90,7 +90,7 @@ export class Character {
     private isVehicle: boolean = false;
 
     constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel) {
-        this.characterResource = initialCharacter;
+        this.model = initialCharacter;
         this.mvp = new webgl.Matrix4();
         
         // Initialize canvas and WebGL
@@ -100,7 +100,7 @@ export class Character {
         
         // Load initial character
         this.loadFromSessionStorage();
-        this.loadCharacterModel(this.characterResource);
+        this.loadCharacterModel(this.model);
     }
 
     private initializeCanvas(canvasId: string): void {
@@ -210,18 +210,18 @@ export class Character {
         }
     }
 
-    public loadCharacterModel(char: CharacterModel) {
-        this.characterResource = char;
+    public loadCharacterModel(model: CharacterModel) {
+        this.model = model;
         
         function encodeUriPath(path: string): string {
             return encodeURIComponent(path).replace(/%2F/g, '/');
         }
-        console.log("Downloading character assets for", char.name);
+        console.log("Downloading character assets for", model.name);
 
         // Download all resources.
         // Here we use `setRawDataURI()` to manually load the resources because the path may contain `#` which is not allowed in URLs
-        const resources = [char.skeleton, char.atlas, char.texture];
-        const basePath = char.resourcePath ?? "";
+        const resources = [model.skeleton, model.atlas, model.texture];
+        const basePath = model.resourcePath ?? "";
         Promise.all(resources.map(async resource => {
             const response = await fetch(basePath + encodeUriPath(resource));
             const blob = await response.blob();
@@ -236,9 +236,9 @@ export class Character {
             });
 
             this.assetManager.removeAll();
-            this.assetManager.loadBinary(char.skeleton, () => {
-                this.assetManager.loadTextureAtlas(char.atlas, () => {
-                    console.log("Loaded character assets for", char.name);
+            this.assetManager.loadBinary(model.skeleton, () => {
+                this.assetManager.loadTextureAtlas(model.atlas, () => {
+                    console.log("Loaded character assets for", model.name);
                     resources.forEach((resource) => {
                         this.assetManager.setRawDataURI(resource, ""); // release memory
                     });
@@ -274,7 +274,7 @@ export class Character {
         sessionStorage.setItem('arkpets-character-' + this.canvas.id, JSON.stringify({
             position: this.position,
             currentAction: this.currentAction,
-            characterResource: this.characterResource
+            characterResource: this.model
         }));
     }
 
@@ -284,13 +284,13 @@ export class Character {
             const state = JSON.parse(saved);
             this.position = state.position;
             this.currentAction = state.currentAction;
-            this.characterResource = state.characterResource;
+            this.model = state.characterResource;
         }
     }
 
     private load(): void {
         if (this.assetManager.isLoadingComplete()) {
-            this.character = this.loadCharacter(this.characterResource, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
+            this.character = this.loadCharacter(this.model, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
 
             if (!this.getAnimationNames().includes(this.currentAction.animation)) {
                 // If swithing from character to vehicle, make sure it's not in `Sleep` or `Sit`
@@ -309,7 +309,7 @@ export class Character {
 
             requestAnimationFrame(this.render.bind(this));
         } else {
-            console.debug("Loading assets of character", this.characterResource.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
+            console.debug("Loading assets of character", this.model.name, "progress", this.assetManager.getLoaded(), "/", this.assetManager.getToLoad());
             requestAnimationFrame(this.load.bind(this));
         }
     }
@@ -713,5 +713,9 @@ export class Character {
 
     public getCanvasId(): string {
         return this.canvas.id;
+    }
+
+    public getModel(): CharacterModel {
+        return this.model;
     }
 }
