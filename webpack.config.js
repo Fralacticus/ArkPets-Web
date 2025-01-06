@@ -31,6 +31,7 @@ module.exports = {
       export: 'default',
     },
     globalObject: 'this',
+    publicPath: '/dist/',
   },
   devServer: {
     static: {
