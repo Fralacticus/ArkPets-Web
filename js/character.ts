@@ -89,7 +89,10 @@ export class Character {
     // Vehicle can't sit & sleep
     private isVehicle: boolean = false;
 
-    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel) {
+    private allowInteract: boolean = true;
+
+    constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel, allowInteract: boolean = true) {
+        this.allowInteract = allowInteract;
         this.model = initialCharacter;
         this.mvp = new webgl.Matrix4();
         
@@ -138,22 +141,26 @@ export class Character {
     }
 
     private setupEventListeners(onContextMenu: (e: MouseEvent | TouchEvent) => void): void {
-        // React to click events
-        this.canvas.addEventListener('click', this.handleCanvasClick.bind(this));
-
-        // Context menu
-        this.canvas.addEventListener('contextmenu', onContextMenu);
-
-        // Mouse events
-        this.canvas.addEventListener('mousedown', this.handleDragStart.bind(this));
+        // Track mouse position to decide mouse over
         document.addEventListener('mousemove', this.handleMouseMove.bind(this));
-        document.addEventListener('mousemove', this.handleDrag.bind(this));
-        document.addEventListener('mouseup', this.handleDragEnd.bind(this));
-        
-        // Touch events
-        this.canvas.addEventListener('touchstart', this.handleDragStart.bind(this));
-        document.addEventListener('touchmove', this.handleDrag.bind(this));
-        document.addEventListener('touchend', this.handleDragEnd.bind(this));
+
+        if (this.allowInteract) {
+            // React to click events
+            this.canvas.addEventListener('click', this.handleCanvasClick.bind(this));
+
+            // Context menu
+            this.canvas.addEventListener('contextmenu', onContextMenu);
+
+            // Mouse events
+            this.canvas.addEventListener('mousedown', this.handleDragStart.bind(this));
+            document.addEventListener('mousemove', this.handleDrag.bind(this));
+            document.addEventListener('mouseup', this.handleDragEnd.bind(this));
+            
+            // Touch events
+            this.canvas.addEventListener('touchstart', this.handleDragStart.bind(this));
+            document.addEventListener('touchmove', this.handleDrag.bind(this));
+            document.addEventListener('touchend', this.handleDragEnd.bind(this));
+        }
     }
 
     private initFramebuffer(): void {
@@ -504,10 +511,9 @@ export class Character {
             pixelColor
         );
         this.isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0;
-        if (this.isMouseOver) {
-            this.canvas.style.pointerEvents = 'auto';
+        if (this.allowInteract) {
+            this.canvas.style.pointerEvents = this.isMouseOver ? 'auto' : 'none';
         } else {
-            // Disable any mouse interaction so that the webpage content can be selected
             this.canvas.style.pointerEvents = 'none';
         }
 
@@ -528,9 +534,9 @@ export class Character {
 
         this.gl.uniform1i(uTexture, 0); // Use texture unit 0 for spine character
         this.gl.uniform4f(uOutlineColor, 1.0, 1.0, 0.0, 1.0); // yellow
-        this.gl.uniform1f(uOutlineWidth, this.isMouseOver ? 2.0 : 0.0); // Show outline when mouse is over
+        this.gl.uniform1f(uOutlineWidth, this.allowInteract && this.isMouseOver ? 2.0 : 0.0); // Show outline only in interactive mode
         this.gl.uniform2i(uTextureSize, this.canvas.width, this.canvas.height);
-        this.gl.uniform1f(uAlpha, 1.0);
+        this.gl.uniform1f(uAlpha, (!this.allowInteract && this.isMouseOver) ? 0.3 : 1.0); // Reduce opacity when non-interactive and mouse over
 
         // Bind framebuffer texture
         this.gl.activeTexture(this.gl.TEXTURE0);
@@ -717,5 +723,13 @@ export class Character {
 
     public getModel(): CharacterModel {
         return this.model;
+    }
+
+    public isAllowInteract(): boolean {
+        return this.allowInteract;
+    }
+
+    public setAllowInteract(allowInteract: boolean): void {
+        this.allowInteract = allowInteract;
     }
 }
