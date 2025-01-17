@@ -501,19 +501,25 @@ export class Character {
         const canvasRect = this.canvas.getBoundingClientRect();
         let pixelX = (this.currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
         let pixelY = this.canvas.height - (this.currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
-        let pixelColor = new Uint8Array(4);
-        this.gl.readPixels(
-            pixelX, 
-            pixelY, 
-            1, 1, 
-            this.gl.RGBA, 
-            this.gl.UNSIGNED_BYTE, 
-            pixelColor
-        );
-        this.isMouseOver = pixelColor[0] !== 0 || pixelColor[1] !== 0 || pixelColor[2] !== 0;
-        if (this.allowInteract) {
-            this.canvas.style.pointerEvents = this.isMouseOver ? 'auto' : 'none';
+        if (pixelX >= 0 && pixelX < this.canvas.width && pixelY >= 0 && pixelY < this.canvas.height) {
+            // Mouse inside canvas. Check whether it's over the character
+            let pixelColor = new Uint8Array(4);
+            this.gl.readPixels(
+                pixelX, 
+                pixelY, 
+                1, 1, 
+                this.gl.RGBA, 
+                this.gl.UNSIGNED_BYTE, 
+                pixelColor
+            );
+            this.isMouseOver = pixelColor[3] !== 0;
+            if (this.allowInteract) {
+                this.canvas.style.pointerEvents = this.isMouseOver ? 'auto' : 'none';
+            } else {
+                this.canvas.style.pointerEvents = 'none';
+            }
         } else {
+            this.isMouseOver = false;
             this.canvas.style.pointerEvents = 'none';
         }
 
