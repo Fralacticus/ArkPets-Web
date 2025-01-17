@@ -1,8 +1,15 @@
+.arkpets-canvas {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+}
+
 #arkpets-menu {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 120;
+    z-index: 1001;
     background-color: white;
     border: 1px solid #ccc;
     padding: 5px 0;
