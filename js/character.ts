@@ -468,8 +468,7 @@ export class Character {
         }
 
         // Update canvas position to `position`
-        this.canvas.style.left = this.position.x + "px";
-        this.canvas.style.top = this.position.y + "px";
+        this.canvas.style.transform = `translate(${this.position.x}px, ${this.position.y}px)`;
 
         // 1st pass - render Spine character to framebuffer
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffer);
@@ -646,8 +645,7 @@ export class Character {
             // Update position
             this.position.x = newX;
             this.position.y = newY;
-            this.canvas.style.left = this.position.x + 'px';
-            this.canvas.style.top = this.position.y + 'px';
+            this.canvas.style.transform = `translate(${this.position.x}px, ${this.position.y}px)`;
             
             this.lastDragEvent = e as MouseEvent;
             
