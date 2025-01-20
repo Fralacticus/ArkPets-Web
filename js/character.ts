@@ -12,6 +12,10 @@ const MAX_VELOCITY = 1000; // maximum velocity in pixels per second
 const MIN_VELOCITY = 5; // threshold for stopping
 const BOUNCE_DAMPING = 0.7; // energy loss on bounce
 
+// Canvas size in pixels (pixels in screen)
+const CANVAS_WIDTH = 150;
+const CANVAS_HEIGHT = 150;
+
 const ANIMATION_NAMES = ["Relax", "Interact", "Move", "Sit" , "Sleep"];
 const ANIMATION_MARKOV = [
     [0.5, 0.0, 0.25, 0.15, 0.1],
@@ -358,17 +362,13 @@ export class Character {
         }
         animationState.addListener(new AnimationStateAdapter());
 
-        // Use fixed size for now
-        const minWidth = 300;
-        const minHeight = 300;
-        
         // Set canvas display size
-        this.canvas.style.width = minWidth / this.pixelRatio + "px";
-        this.canvas.style.height = minHeight / this.pixelRatio + "px";
-        
+        this.canvas.style.width = CANVAS_WIDTH + "px";
+        this.canvas.style.height = CANVAS_HEIGHT + "px";
+
         // Set canvas internal resolution
-        this.canvas.width = minWidth;
-        this.canvas.height = minHeight;
+        this.canvas.width = CANVAS_WIDTH * this.pixelRatio;
+        this.canvas.height = CANVAS_HEIGHT * this.pixelRatio;
         
         // Update the projection matrix to match the new resolution
         this.mvp.ortho2d(0, 0, this.canvas.width, this.canvas.height);
