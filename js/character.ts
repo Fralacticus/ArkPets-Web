@@ -4,9 +4,6 @@ import outlineFragmentShader from '../shaders/OutlineFragment.glsl';
 import outlineVertexShader from '../shaders/OutlineVertex.glsl';
 import { CharacterModel } from './types.js';
 
-// Supersampling is necessary for high-res display
-const SUPERSAMPLE_FACTOR = 2;
-
 const MOVING_SPEED = 30; // pixels per second
 
 const GRAVITY = 1000; // pixels per second squared
@@ -91,10 +88,14 @@ export class Character {
 
     private allowInteract: boolean = true;
 
+    // Supersampling is necessary for high-res display
+    private pixelRatio!: number;
+
     constructor(canvasId: string, onContextMenu: (e: MouseEvent | TouchEvent) => void, initialCharacter: CharacterModel, allowInteract: boolean = true) {
         this.allowInteract = allowInteract;
         this.model = initialCharacter;
         this.mvp = new webgl.Matrix4();
+        this.pixelRatio = window.devicePixelRatio ?? 2;
         
         // Initialize canvas and WebGL
         this.initializeCanvas(canvasId);
@@ -294,7 +295,7 @@ export class Character {
 
     private load(): void {
         if (this.assetManager.isLoadingComplete()) {
-            this.character = this.loadCharacter(this.model, 0.3 * 0.75 * SUPERSAMPLE_FACTOR);
+            this.character = this.loadCharacter(this.model, 0.3 * 0.75 * this.pixelRatio);
 
             if (!this.getAnimationNames().includes(this.currentAction.animation)) {
                 // If swithing from character to vehicle, make sure it's not in `Sleep` or `Sit`
@@ -362,8 +363,8 @@ export class Character {
         const minHeight = 300;
         
         // Set canvas display size
-        this.canvas.style.width = minWidth / SUPERSAMPLE_FACTOR + "px";
-        this.canvas.style.height = minHeight / SUPERSAMPLE_FACTOR + "px";
+        this.canvas.style.width = minWidth / this.pixelRatio + "px";
+        this.canvas.style.height = minHeight / this.pixelRatio + "px";
         
         // Set canvas internal resolution
         this.canvas.width = minWidth;
@@ -495,8 +496,8 @@ export class Character {
 
         // Read pixels before 2nd pass to determine if mouse is over character
         const canvasRect = this.canvas.getBoundingClientRect();
-        let pixelX = (this.currentMousePos.x - canvasRect.x) * SUPERSAMPLE_FACTOR;
-        let pixelY = this.canvas.height - (this.currentMousePos.y - canvasRect.y) * SUPERSAMPLE_FACTOR;
+        let pixelX = (this.currentMousePos.x - canvasRect.x) * this.pixelRatio;
+        let pixelY = this.canvas.height - (this.currentMousePos.y - canvasRect.y) * this.pixelRatio;
         if (pixelX >= 0 && pixelX < this.canvas.width && pixelY >= 0 && pixelY < this.canvas.height) {
             // Mouse inside canvas. Check whether it's over the character
             let pixelColor = new Uint8Array(4);
